@@ -20,7 +20,7 @@ use crate::bindings::flags::*;
 
 bitflags! {
     /// Flags to configure RandomX behaviour.
-    #[derive(Debug)]
+    #[derive(Debug, Copy, Clone)]
     pub struct RandomXFlags: u32 {
         const DEFAULT = randomx_flags_RANDOMX_FLAG_DEFAULT;
         const LARGE_PAGES = randomx_flags_RANDOMX_FLAG_LARGE_PAGES;
