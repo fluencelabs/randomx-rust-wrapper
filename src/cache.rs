@@ -42,7 +42,7 @@ impl Cache {
     pub fn reinit(&mut self, global_nonce: &[u8]) {
         unsafe {
             randomx_init_cache(
-                cache,
+                self.cache,
                 global_nonce.as_ptr() as *const std::ffi::c_void,
                 global_nonce.len(),
             )

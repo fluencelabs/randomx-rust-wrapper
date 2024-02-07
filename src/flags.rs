@@ -42,6 +42,14 @@ impl RandomXFlags {
     pub fn is_light_mode(&self) -> bool {
         !self.is_fast_mode()
     }
+
+    pub fn recommended() -> Self {
+        let recommended = unsafe { randomx_get_flags() };
+
+        // this unwrap is safe b/c the randomx_get_flags function will return only
+        // existing flags
+        RandomXFlags::from_bits(recommended).unwrap()
+    }
 }
 
 impl Default for RandomXFlags {
