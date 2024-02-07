@@ -43,6 +43,14 @@ impl RandomXFlags {
         !self.is_fast_mode()
     }
 
+    /// (from the RandomX doc) Returns the recommended flags to be used.
+    ///
+    /// Does not include:
+    /// * FLAG_LARGE_PAGES
+    /// * FLAG_FULL_MEM
+    /// * FLAG_SECURE
+    ///
+    /// The above flags need to be set manually, if required.
     pub fn recommended() -> Self {
         let recommended = unsafe { randomx_get_flags() };
 
