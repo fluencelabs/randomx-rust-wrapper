@@ -24,6 +24,14 @@ pub mod vm;
 
 pub type RResult<T> = Result<T, errors::RandomXError>;
 
+pub use cache::Cache;
+pub use dataset::Dataset;
+pub use errors::RandomXError;
+pub use errors::VmCreationError;
+pub use flags::RandomXFlags;
+pub use result_hash::ResultHash;
+pub use vm::RandomXVM;
+
 macro_rules! try_alloc {
     ($alloc:expr, $error:expr) => {{
         let result = unsafe { $alloc };
