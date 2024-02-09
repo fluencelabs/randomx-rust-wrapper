@@ -15,7 +15,6 @@
  */
 
 use crate::bindings::cache::*;
-use crate::errors::RandomXError::CacheAllocationFailed;
 use crate::flags::RandomXFlags;
 use crate::try_alloc;
 use crate::RResult;
@@ -26,10 +25,19 @@ pub struct Cache {
 
 impl Cache {
     /// Creates RandomX cache with the provided global_nonce.
-    pub fn new(flags: RandomXFlags, global_nonce: &[u8]) -> RResult<Self> {
+    /// Flags is any combination of these 2 flags (each flag can be set or not set):
+    ///  - RANDOMX_FLAG_LARGE_PAGES - allocate memory in large pages
+    ///  - RANDOMX_FLAG_JIT - create cache structure with JIT compilation support; this makes
+    ///                                     subsequent Dataset initialization faster
+    /// Optionally, one of these two flags may be selected:
+    ///  - RANDOMX_FLAG_ARGON2_SSSE3 - optimized Argon2 for CPUs with the SSSE3 instruction set
+    ///                                makes subsequent cache initialization faster
+    ///   - RANDOMX_FLAG_ARGON2_AVX2 - optimized Argon2 for CPUs with the AVX2 instruction set
+    ///                                makes subsequent cache initialization faster
+    pub fn new(global_nonce: &[u8], flags: RandomXFlags) -> RResult<Self> {
         let cache = try_alloc!(
             randomx_alloc_cache(flags.bits()),
-            CacheAllocationFailed { flags }
+            crate::RandomXError::CacheAllocationFailed { flags }
         );
 
         let mut cache = Cache { cache };

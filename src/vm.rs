@@ -25,14 +25,14 @@ use crate::result_hash::ResultHash;
 use crate::try_alloc;
 use crate::RResult;
 
-pub struct RandomXVM<'state, T: 'state> {
+pub struct RandomXVM<'state, T> {
     vm: *mut randomx_vm,
     // too ensure that state outlives VM
     state: PhantomData<&'state T>,
 }
 
 impl RandomXVM<'_, Cache> {
-    pub fn light(flags: RandomXFlags, cache: &'_ Cache) -> RResult<Self> {
+    pub fn light(cache: &'_ Cache, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_light_mode() {
             return Err(VmCreationError::IncorrectFastModeFlag { flags })?;
         }
@@ -55,7 +55,7 @@ impl RandomXVM<'_, Cache> {
 }
 
 impl RandomXVM<'_, Dataset> {
-    pub fn fast(flags: RandomXFlags, dataset: &'_ Dataset) -> RResult<Self> {
+    pub fn fast(dataset: &'_ Dataset, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_fast_mode() {
             return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
         }
@@ -83,7 +83,8 @@ impl<T> Drop for RandomXVM<'_, T> {
 }
 
 impl<T> RandomXVM<'_, T> {
-    pub fn calculate_hash(&self, local_nonce: &[u8]) -> ResultHash {
+    /// Calculates a RandomX hash value.
+    pub fn hash(&self, local_nonce: &[u8]) -> ResultHash {
         let mut hash = ResultHash::empty();
 
         unsafe {
@@ -98,7 +99,8 @@ impl<T> RandomXVM<'_, T> {
         hash
     }
 
-    pub fn calculuate_hash_first(&self, local_nonce: &[u8]) {
+    /// Begins a RandomX hash calculation.
+    pub fn hash_first(&self, local_nonce: &[u8]) {
         unsafe {
             randomx_calculate_hash_first(
                 self.vm,
@@ -108,7 +110,9 @@ impl<T> RandomXVM<'_, T> {
         };
     }
 
-    pub fn calculuate_hash_next(&self, local_nonce: &[u8]) -> ResultHash {
+    /// Output the hash value of the previous input
+    /// and begin the calculation of the next hash.
+    pub fn hash_next(&self, local_nonce: &[u8]) -> ResultHash {
         let mut hash = ResultHash::empty();
 
         unsafe {
@@ -123,11 +127,35 @@ impl<T> RandomXVM<'_, T> {
         hash
     }
 
-    pub fn calculuate_hash_last(&self) -> ResultHash {
+    /// Output the hash value of the previous input.
+    pub fn hash_last(&self) -> ResultHash {
         let mut hash = ResultHash::empty();
 
         unsafe { randomx_calculate_hash_last(self.vm, hash.as_raw_mut()) };
 
         hash
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Cache, Dataset, RandomXFlags, RandomXVM};
+
+    #[test]
+    fn light_no_creates_with_full_mem() {
+        let flags = RandomXFlags::recommended_full_mem();
+        let cache = Cache::new(&[0, 1], flags).unwrap();
+        let vm = RandomXVM::light(&cache, flags);
+
+        assert!(vm.is_err());
+    }
+
+    #[test]
+    fn fast_no_creates_without_full_mem() {
+        let flags = RandomXFlags::recommended();
+        let dataset = Dataset::new(&[0, 1], flags).unwrap();
+        let vm = RandomXVM::fast(&dataset, flags);
+
+        assert!(vm.is_err());
     }
 }

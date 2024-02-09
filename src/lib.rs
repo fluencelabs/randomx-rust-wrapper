@@ -14,12 +14,26 @@
  * limitations under the License.
  */
 
+#![warn(rust_2018_idioms)]
+#![warn(rust_2021_compatibility)]
+#![deny(
+    dead_code,
+    nonstandard_style,
+    unused_imports,
+    unused_mut,
+    unused_variables,
+    unused_unsafe,
+    unreachable_patterns
+)]
+
 pub mod bindings;
 pub mod cache;
 pub mod dataset;
 pub mod errors;
 pub mod flags;
 pub mod result_hash;
+#[cfg(test)]
+mod tests;
 pub mod vm;
 
 pub type RResult<T> = Result<T, errors::RandomXError>;

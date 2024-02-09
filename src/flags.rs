@@ -20,7 +20,7 @@ use crate::bindings::flags::*;
 
 bitflags! {
     /// Flags to configure RandomX behaviour.
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     pub struct RandomXFlags: u32 {
         const DEFAULT = randomx_flags_RANDOMX_FLAG_DEFAULT;
         const LARGE_PAGES = randomx_flags_RANDOMX_FLAG_LARGE_PAGES;
@@ -57,6 +57,13 @@ impl RandomXFlags {
         // this unwrap is safe b/c the randomx_get_flags function will return only
         // existing flags
         RandomXFlags::from_bits(recommended).unwrap()
+    }
+
+    pub fn recommended_full_mem() -> Self {
+        let mut recommended = Self::recommended();
+        recommended.insert(RandomXFlags::FULL_MEM);
+
+        recommended
     }
 }
 

@@ -26,13 +26,21 @@ pub struct Dataset {
 }
 
 impl Dataset {
+    /// Create a new database with provided global nonce and flags.
+    /// Only RANDOMX_FLAG_LARGE_PAGES is supported (can be set or unset),
+    /// it forces memory allocation in large pages.
+    pub fn new(global_nonce: &[u8], flags: RandomXFlags) -> RResult<Self> {
+        let cache = Cache::new(global_nonce, flags)?;
+        Self::from_cache(&cache, flags.contains(RandomXFlags::LARGE_PAGES))
+    }
+
     /// Creates a new database with the provided cache,
-    /// large_pages_enabled forces it to allocate memory in large pages
-    pub fn new(cache: &Cache, large_pages_enabled: bool) -> RResult<Self> {
+    /// large_pages_enabled forces it to allocate memory in large pages.
+    pub fn from_cache(cache: &Cache, large_pages_enabled: bool) -> RResult<Self> {
         let flags = if large_pages_enabled {
-            RandomXFlags::default()
-        } else {
             RandomXFlags::LARGE_PAGES
+        } else {
+            RandomXFlags::default()
         };
 
         let dataset =
