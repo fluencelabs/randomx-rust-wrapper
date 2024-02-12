@@ -18,21 +18,27 @@ use std::marker::PhantomData;
 
 use crate::bindings::vm::*;
 use crate::cache::Cache;
+use crate::cache::CacheRawAPI;
 use crate::dataset::Dataset;
+use crate::dataset::DatasetRawAPI;
 use crate::errors::VmCreationError;
 use crate::flags::RandomXFlags;
 use crate::result_hash::ResultHash;
 use crate::try_alloc;
 use crate::RResult;
 
+#[derive(Debug)]
 pub struct RandomXVM<'state, T> {
     vm: *mut randomx_vm,
     // too ensure that state outlives VM
     state: PhantomData<&'state T>,
 }
 
-impl RandomXVM<'_, Cache> {
-    pub fn light(cache: &'_ Cache, flags: RandomXFlags) -> RResult<Self> {
+impl<T> RandomXVM<'_, T>
+where
+    T: CacheRawAPI,
+{
+    pub fn light(cache: &T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_light_mode() {
             return Err(VmCreationError::IncorrectFastModeFlag { flags })?;
         }
@@ -54,8 +60,11 @@ impl RandomXVM<'_, Cache> {
     }
 }
 
-impl RandomXVM<'_, Dataset> {
-    pub fn fast(dataset: &'_ Dataset, flags: RandomXFlags) -> RResult<Self> {
+impl<T> RandomXVM<'_, T>
+where
+    T: DatasetRawAPI,
+{
+    pub fn fast(dataset: &T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_fast_mode() {
             return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
         }

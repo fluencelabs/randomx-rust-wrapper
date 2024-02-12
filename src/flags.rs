@@ -43,6 +43,10 @@ impl RandomXFlags {
         !self.is_fast_mode()
     }
 
+    pub fn is_large_pages(&self) -> bool {
+        self.contains(RandomXFlags::LARGE_PAGES)
+    }
+
     /// (from the RandomX doc) Returns the recommended flags to be used.
     ///
     /// Does not include:

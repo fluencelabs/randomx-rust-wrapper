@@ -19,9 +19,22 @@ use crate::flags::RandomXFlags;
 use crate::try_alloc;
 use crate::RResult;
 
+#[derive(Debug)]
 pub struct Cache {
     cache: *mut randomx_cache,
 }
+
+unsafe impl Send for Cache {}
+
+/// Contains a handle Cache, can't be created from scratch,
+/// only obtained from already existing Cache.
+#[derive(Clone, Debug)]
+pub struct CacheHandle {
+    // TODO: add reference counter
+    cache: *mut randomx_cache,
+}
+
+unsafe impl Send for CacheHandle {}
 
 impl Cache {
     /// Creates RandomX cache with the provided global_nonce.
@@ -41,13 +54,13 @@ impl Cache {
         );
 
         let mut cache = Cache { cache };
-        cache.reinit(global_nonce);
+        cache.initialize(global_nonce);
         Ok(cache)
     }
 
     /// Initializes the cache memory using the provided global nonce value.
     /// Does nothing if called with the same value again.
-    pub fn reinit(&mut self, global_nonce: &[u8]) {
+    pub fn initialize(&mut self, global_nonce: &[u8]) {
         unsafe {
             randomx_init_cache(
                 self.cache,
@@ -57,7 +70,17 @@ impl Cache {
         };
     }
 
+    pub fn handle(&self) -> CacheHandle {
+        CacheHandle { cache: self.cache }
+    }
+
     pub(crate) fn raw(&self) -> *mut randomx_cache {
+        self.cache
+    }
+}
+
+impl CacheHandle {
+    pub fn raw(&self) -> *mut randomx_cache {
         self.cache
     }
 }
@@ -65,5 +88,21 @@ impl Cache {
 impl Drop for Cache {
     fn drop(&mut self) {
         unsafe { randomx_release_cache(self.cache) }
+    }
+}
+
+pub trait CacheRawAPI {
+    fn raw(&self) -> *mut randomx_cache;
+}
+
+impl CacheRawAPI for Cache {
+    fn raw(&self) -> *mut randomx_cache {
+        self.raw()
+    }
+}
+
+impl CacheRawAPI for CacheHandle {
+    fn raw(&self) -> *mut randomx_cache {
+        self.raw()
     }
 }
