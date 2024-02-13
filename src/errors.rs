@@ -35,11 +35,11 @@ pub enum VmCreationError {
     #[error("vm allocation with flags {flags:?} failed")]
     AllocationFailed { flags: RandomXFlags },
 
+    #[error("to allocate vm in the fast mode, flags {flags:?} must contain the full mem option")]
+    IncorrectFastModeFlag { flags: RandomXFlags },
+
     #[error(
         "to allocate vm in the light mode, flags {flags:?} must no contain the full mem option"
     )]
-    IncorrectFastModeFlag { flags: RandomXFlags },
-
-    #[error("to allocate vm in the fast mode, flags {flags:?} must contain the full mem option")]
     IncorrectLightModeFlag { flags: RandomXFlags },
 }

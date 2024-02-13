@@ -40,7 +40,7 @@ where
 {
     pub fn light(cache: &T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_light_mode() {
-            return Err(VmCreationError::IncorrectFastModeFlag { flags })?;
+            return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
         }
 
         let vm = try_alloc! { randomx_create_vm(flags.bits(), cache.raw(), std::ptr::null_mut()), VmCreationError::AllocationFailed {flags} };
@@ -66,7 +66,7 @@ where
 {
     pub fn fast(dataset: &T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_fast_mode() {
-            return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
+            return Err(VmCreationError::IncorrectFastModeFlag { flags })?;
         }
 
         let vm = try_alloc! { randomx_create_vm(flags.bits(), std::ptr::null_mut(), dataset.raw()), VmCreationError::AllocationFailed {flags} };
