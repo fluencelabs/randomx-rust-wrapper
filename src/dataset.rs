@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::sync::Arc;
+
 use crate::bindings::dataset::*;
 use crate::cache::{Cache, CacheRawAPI};
 use crate::errors::RandomXError::DatasetAllocationError;
@@ -23,20 +25,24 @@ use crate::RResult;
 
 #[derive(Debug)]
 pub struct Dataset {
+    inner: Arc<DatasetInner>,
+}
+
+#[derive(Debug)]
+struct DatasetInner {
     dataset: *mut randomx_dataset,
 }
 
-unsafe impl Send for Dataset {}
+unsafe impl Send for DatasetInner {}
+unsafe impl Sync for DatasetInner {}
 
 /// Contains a handle Cache, can't be created from scratch,
 /// only obtained from already existing Cache.
 #[derive(Clone, Debug)]
 pub struct DatasetHandle {
     // TODO: add reference counter
-    dataset: *mut randomx_dataset,
+    inner: Arc<DatasetInner>,
 }
-
-unsafe impl Send for DatasetHandle {}
 
 impl Dataset {
     /// Allocate and initialize a new database with provided global nonce and flags.
@@ -67,7 +73,10 @@ impl Dataset {
 
         let dataset =
             try_alloc! { randomx_alloc_dataset(flags.bits()), DatasetAllocationError { flags } };
-        let dataset = Self { dataset };
+        let dataset_inner = DatasetInner { dataset };
+        let dataset = Self {
+            inner: Arc::new(dataset_inner),
+        };
         Ok(dataset)
     }
 
@@ -78,17 +87,17 @@ impl Dataset {
 
     /// Initialize dataset with the provided cache.
     pub fn initialize(&mut self, cache: &impl CacheRawAPI, start_item: u64, items_count: u64) {
-        unsafe { randomx_init_dataset(self.dataset, cache.raw(), start_item, items_count) };
+        unsafe { randomx_init_dataset(self.raw(), cache.raw(), start_item, items_count) };
     }
 
     pub fn handle(&self) -> DatasetHandle {
         DatasetHandle {
-            dataset: self.dataset,
+            inner: self.inner.clone(),
         }
     }
 
     pub(crate) fn raw(&self) -> *mut randomx_dataset {
-        self.dataset
+        self.inner.dataset
     }
 }
 
@@ -100,15 +109,15 @@ impl DatasetHandle {
 
     /// Initialize dataset with the provided cache.
     pub fn initialize(&mut self, cache: &impl CacheRawAPI, start_item: u64, items_count: u64) {
-        unsafe { randomx_init_dataset(self.dataset, cache.raw(), start_item, items_count) };
+        unsafe { randomx_init_dataset(self.raw(), cache.raw(), start_item, items_count) };
     }
 
     pub(crate) fn raw(&self) -> *mut randomx_dataset {
-        self.dataset
+        self.inner.dataset
     }
 }
 
-impl Drop for Dataset {
+impl Drop for DatasetInner {
     fn drop(&mut self) {
         unsafe { randomx_release_dataset(self.dataset) }
     }
