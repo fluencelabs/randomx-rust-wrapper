@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::sync::Arc;
+
 use crate::bindings::cache::*;
 use crate::flags::RandomXFlags;
 use crate::try_alloc;
@@ -21,20 +23,23 @@ use crate::RResult;
 
 #[derive(Debug)]
 pub struct Cache {
+    inner: Arc<CacheInner>,
+}
+
+#[derive(Debug)]
+struct CacheInner {
     cache: *mut randomx_cache,
 }
 
-unsafe impl Send for Cache {}
+unsafe impl Send for CacheInner {}
+unsafe impl Sync for CacheInner {}
 
 /// Contains a handle Cache, can't be created from scratch,
 /// only obtained from already existing Cache.
 #[derive(Clone, Debug)]
 pub struct CacheHandle {
-    // TODO: add reference counter
-    cache: *mut randomx_cache,
+    inner: Arc<CacheInner>,
 }
-
-unsafe impl Send for CacheHandle {}
 
 impl Cache {
     /// Creates RandomX cache with the provided global_nonce.
@@ -53,7 +58,10 @@ impl Cache {
             crate::RandomXError::CacheAllocationFailed { flags }
         );
 
-        let mut cache = Cache { cache };
+        let cache_inner = CacheInner { cache };
+        let mut cache = Self {
+            inner: Arc::new(cache_inner),
+        };
         cache.initialize(global_nonce);
         Ok(cache)
     }
@@ -63,7 +71,7 @@ impl Cache {
     pub fn initialize(&mut self, global_nonce: &[u8]) {
         unsafe {
             randomx_init_cache(
-                self.cache,
+                self.raw(),
                 global_nonce.as_ptr() as *const std::ffi::c_void,
                 global_nonce.len(),
             )
@@ -71,21 +79,23 @@ impl Cache {
     }
 
     pub fn handle(&self) -> CacheHandle {
-        CacheHandle { cache: self.cache }
+        CacheHandle {
+            inner: self.inner.clone(),
+        }
     }
 
     pub(crate) fn raw(&self) -> *mut randomx_cache {
-        self.cache
+        self.inner.cache
     }
 }
 
 impl CacheHandle {
     pub fn raw(&self) -> *mut randomx_cache {
-        self.cache
+        self.inner.cache
     }
 }
 
-impl Drop for Cache {
+impl Drop for CacheInner {
     fn drop(&mut self) {
         unsafe { randomx_release_cache(self.cache) }
     }
