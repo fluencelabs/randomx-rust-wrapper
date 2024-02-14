@@ -36,11 +36,10 @@ struct DatasetInner {
 unsafe impl Send for DatasetInner {}
 unsafe impl Sync for DatasetInner {}
 
-/// Contains a handle Cache, can't be created from scratch,
+/// Contains a handle of Dataset, can't be created from scratch,
 /// only obtained from already existing Cache.
 #[derive(Clone, Debug)]
 pub struct DatasetHandle {
-    // TODO: add reference counter
     inner: Arc<DatasetInner>,
 }
 

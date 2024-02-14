@@ -34,7 +34,7 @@ struct CacheInner {
 unsafe impl Send for CacheInner {}
 unsafe impl Sync for CacheInner {}
 
-/// Contains a handle Cache, can't be created from scratch,
+/// Contains a Cache handle, can't be created from scratch,
 /// only obtained from already existing Cache.
 #[derive(Clone, Debug)]
 pub struct CacheHandle {
