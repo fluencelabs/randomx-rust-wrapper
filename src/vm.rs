@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-use std::marker::PhantomData;
-
 use crate::bindings::vm::*;
 use crate::cache::Cache;
 use crate::cache::CacheRawAPI;
@@ -28,27 +26,24 @@ use crate::try_alloc;
 use crate::RResult;
 
 #[derive(Debug)]
-pub struct RandomXVM<'state, T> {
+pub struct RandomXVM<T> {
     vm: *mut randomx_vm,
     // too ensure that state outlives VM
-    state: PhantomData<&'state T>,
+    _state: T,
 }
 
-impl<T> RandomXVM<'_, T>
+impl<T> RandomXVM<T>
 where
     T: CacheRawAPI,
 {
-    pub fn light(cache: &T, flags: RandomXFlags) -> RResult<Self> {
+    pub fn light(cache: T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_light_mode() {
             return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
         }
 
         let vm = try_alloc! { randomx_create_vm(flags.bits(), cache.raw(), std::ptr::null_mut()), VmCreationError::AllocationFailed {flags} };
 
-        let vm = RandomXVM {
-            vm,
-            state: PhantomData,
-        };
+        let vm = RandomXVM { vm, _state: cache };
         Ok(vm)
     }
 
@@ -60,11 +55,11 @@ where
     }
 }
 
-impl<T> RandomXVM<'_, T>
+impl<T> RandomXVM<T>
 where
     T: DatasetRawAPI,
 {
-    pub fn fast(dataset: &T, flags: RandomXFlags) -> RResult<Self> {
+    pub fn fast(dataset: T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_fast_mode() {
             return Err(VmCreationError::IncorrectFastModeFlag { flags })?;
         }
@@ -73,7 +68,7 @@ where
 
         let vm = RandomXVM {
             vm,
-            state: PhantomData,
+            _state: dataset,
         };
 
         Ok(vm)
@@ -85,13 +80,13 @@ where
     }
 }
 
-impl<T> Drop for RandomXVM<'_, T> {
+impl<T> Drop for RandomXVM<T> {
     fn drop(&mut self) {
         unsafe { randomx_destroy_vm(self.vm) }
     }
 }
 
-impl<T> RandomXVM<'_, T> {
+impl<T> RandomXVM<T> {
     /// Calculates a RandomX hash value.
     pub fn hash(&self, local_nonce: &[u8]) -> ResultHash {
         let mut hash = ResultHash::empty();
@@ -154,7 +149,7 @@ mod tests {
     fn light_no_creates_with_full_mem() {
         let flags = RandomXFlags::recommended_full_mem();
         let cache = Cache::new(&[0, 1], flags).unwrap();
-        let vm = RandomXVM::light(&cache, flags);
+        let vm = RandomXVM::light(cache.handle(), flags);
 
         assert!(vm.is_err());
     }
@@ -163,7 +158,7 @@ mod tests {
     fn fast_no_creates_without_full_mem() {
         let flags = RandomXFlags::recommended();
         let dataset = Dataset::new(&[0, 1], flags).unwrap();
-        let vm = RandomXVM::fast(&dataset, flags);
+        let vm = RandomXVM::fast(dataset.handle(), flags);
 
         assert!(vm.is_err());
     }
