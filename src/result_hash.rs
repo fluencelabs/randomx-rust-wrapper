@@ -14,37 +14,47 @@
  * limitations under the License.
  */
 
+use hex::FromHex;
+use serde::Deserialize;
+use serde::Serialize;
+
 pub const RANDOMX_RESULT_SIZE: usize = 32;
 
-type ResultHashSlice = [u8; RANDOMX_RESULT_SIZE];
+type ResultHashInner = [u8; RANDOMX_RESULT_SIZE];
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ResultHash {
-    hash: ResultHashSlice,
-}
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct ResultHash(ResultHashInner);
 
 impl ResultHash {
-    pub fn from_slice(hash: ResultHashSlice) -> Self {
-        Self { hash }
+    pub fn from_slice(hash: ResultHashInner) -> Self {
+        Self(hash)
     }
 
-    pub fn into_slice(self) -> ResultHashSlice {
-        self.hash
+    pub fn into_slice(self) -> ResultHashInner {
+        self.0
     }
 
     pub(crate) fn empty() -> Self {
-        Self {
-            hash: [0u8; RANDOMX_RESULT_SIZE],
-        }
+        Self([0u8; RANDOMX_RESULT_SIZE])
     }
 
     pub(crate) fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
-        self.hash.as_mut_ptr() as *mut std::ffi::c_void
+        self.0.as_mut_ptr() as *mut std::ffi::c_void
     }
 }
 
-impl AsRef<ResultHashSlice> for ResultHash {
-    fn as_ref(&self) -> &ResultHashSlice {
-        &self.hash
+impl AsRef<ResultHashInner> for ResultHash {
+    fn as_ref(&self) -> &ResultHashInner {
+        &self.0
+    }
+}
+
+impl FromHex for ResultHash {
+    type Error = <[u8; 32] as FromHex>::Error;
+
+    fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+        ResultHashInner::from_hex(hex).map(Self)
     }
 }
