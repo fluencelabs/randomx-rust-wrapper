@@ -22,7 +22,7 @@ pub const RANDOMX_RESULT_SIZE: usize = 32;
 
 type ResultHashInner = [u8; RANDOMX_RESULT_SIZE];
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[repr(transparent)]
 pub struct ResultHash(ResultHashInner);
