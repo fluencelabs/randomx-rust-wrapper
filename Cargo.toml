@@ -1,6 +1,6 @@
 [package]
 name = "randomx-rust-wrapper"
-version = "0.2.0"
+version = "0.4.0"
 description = "RandomX Rust wrapper intended for Fluence Capacity Commitment prover and verifier"
 authors = ["Fluence Labs"]
 edition = "2021"
@@ -13,9 +13,12 @@ path = "src/lib.rs"
 doctest = false
 
 [dependencies]
-bitflags = "2.4.1"
+bitflags = "2.4"
+hex = "0.4"
 libc = "0.2"
 thiserror = "1.0"
+
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 rand = "0.8"
