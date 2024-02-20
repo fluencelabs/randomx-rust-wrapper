@@ -18,7 +18,7 @@ use thiserror::Error as ThisError;
 
 use crate::flags::RandomXFlags;
 
-#[derive(ThisError, Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum RandomXError {
     #[error("cache allocation with flags {flags:?} failed")]
     CacheAllocationFailed { flags: RandomXFlags },
@@ -30,7 +30,7 @@ pub enum RandomXError {
     VMCreationFailed(#[from] VmCreationError),
 }
 
-#[derive(ThisError, Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum VmCreationError {
     #[error("vm allocation with flags {flags:?} failed")]
     AllocationFailed { flags: RandomXFlags },
