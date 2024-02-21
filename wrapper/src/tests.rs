@@ -22,13 +22,13 @@ use crate::ResultHash;
 
 fn run_light_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {
     let cache = Cache::new(&global_nonce, flags).unwrap();
-    let vm = RandomXVM::light(&cache, flags).unwrap();
+    let vm = RandomXVM::light(cache, flags).unwrap();
     vm.hash(&local_nonce)
 }
 
 fn run_fast_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {
     let dataset = Dataset::new(&global_nonce, flags).unwrap();
-    let vm = RandomXVM::fast(&dataset, flags).unwrap();
+    let vm = RandomXVM::fast(dataset, flags).unwrap();
     vm.hash(&local_nonce)
 }
 

@@ -22,6 +22,7 @@ use crate::dataset::DatasetRawAPI;
 use crate::errors::VmCreationError;
 use crate::flags::RandomXFlags;
 use crate::result_hash::ResultHash;
+use crate::result_hash::ToRawMut;
 use crate::try_alloc;
 use crate::RResult;
 

@@ -43,6 +43,12 @@ impl AsRef<ResultHashInner> for ResultHash {
     }
 }
 
+impl AsMut<ResultHashInner> for ResultHash {
+    fn as_mut(&mut self) -> &mut ResultHashInner {
+        &mut self.0
+    }
+}
+
 impl FromHex for ResultHash {
     type Error = <[u8; 32] as FromHex>::Error;
 

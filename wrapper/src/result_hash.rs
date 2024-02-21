@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use randomx_rust_wrapper_types::ResultHash;
+pub(crate) use randomx_rust_wrapper_types::ResultHash;
 use randomx_rust_wrapper_types::RANDOMX_RESULT_SIZE;
 
 pub(crate) trait ToRawMut {
@@ -25,10 +25,10 @@ pub(crate) trait ToRawMut {
 
 impl ToRawMut for ResultHash {
     fn empty() -> Self {
-        Self([0u8; RANDOMX_RESULT_SIZE])
+        ResultHash::from_slice([0u8; RANDOMX_RESULT_SIZE])
     }
 
     fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
-        self.0.as_mut_ptr() as *mut std::ffi::c_void
+        self.as_mut().as_mut_ptr() as *mut std::ffi::c_void
     }
 }
