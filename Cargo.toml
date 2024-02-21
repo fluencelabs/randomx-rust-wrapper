@@ -1,27 +1,18 @@
-[package]
-name = "randomx-rust-wrapper"
-version = "0.4.2"
-description = "RandomX Rust wrapper intended for Fluence Capacity Commitment prover and verifier"
-authors = ["Fluence Labs"]
-edition = "2021"
-license = "Apache-2.0"
-repository = "https://github.com/fluencelabs/randomx-rust-wrapper"
-publish = true
+[workspace]
+resolver = "2"
+members = [
+    "crates/types",
+    "wrapper",
+]
 
-[lib]
-path = "src/lib.rs"
-doctest = false
+[workspace.dependencies]
+randomx-rust-wrapper-types = { path = "./crates/types", version = "0.1.0" }
 
-[dependencies]
 bitflags = "2.4"
+cmake = "0.1"
+rand = "0.8"
 hex = "0.4"
 libc = "0.2"
 thiserror = "1.0"
 
 serde = { version = "1.0", features = ["derive"] }
-
-[dev-dependencies]
-rand = "0.8"
-
-[build-dependencies]
-cmake = "0.1"

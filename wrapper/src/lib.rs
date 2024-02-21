@@ -31,7 +31,7 @@ pub mod cache;
 pub mod dataset;
 pub mod errors;
 pub mod flags;
-pub mod result_hash;
+pub(crate) mod result_hash;
 #[cfg(test)]
 mod tests;
 pub mod vm;
