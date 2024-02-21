@@ -1,4 +1,0 @@
-[submodule "randomx"]
-	path = wrapper/randomx
-	url = https://github.com/fluencelabs/randomx
-	branch = fluence
