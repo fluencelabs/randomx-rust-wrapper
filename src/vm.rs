@@ -21,9 +21,9 @@ use crate::dataset::Dataset;
 use crate::dataset::DatasetRawAPI;
 use crate::errors::VmCreationError;
 use crate::flags::RandomXFlags;
-use crate::result_hash::ResultHash;
 use crate::try_alloc;
 use crate::RResult;
+use crate::ResultHash;
 
 #[derive(Debug)]
 pub struct RandomXVM<T> {

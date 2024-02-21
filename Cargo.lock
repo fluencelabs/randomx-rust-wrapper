@@ -118,8 +118,17 @@ dependencies = [
  "hex",
  "libc",
  "rand",
+ "randomx-types",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "randomx-types"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
 ]
 
 [[package]]

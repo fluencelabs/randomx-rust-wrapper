@@ -36,11 +36,11 @@ impl ResultHash {
         self.0
     }
 
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         Self([0u8; RANDOMX_RESULT_SIZE])
     }
 
-    pub(crate) fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
+    pub fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
         self.0.as_mut_ptr() as *mut std::ffi::c_void
     }
 }
