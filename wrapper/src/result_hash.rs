@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-pub(crate) use randomx_rust_wrapper_types::ResultHash;
+pub use randomx_rust_wrapper_types::ResultHash;
 use randomx_rust_wrapper_types::RANDOMX_RESULT_SIZE;
 
 pub(crate) trait ToRawMut {
