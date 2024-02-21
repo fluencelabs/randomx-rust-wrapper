@@ -1,0 +1,3 @@
+[submodule "wrapper/randomx"]
+	path = wrapper/randomx
+	url = git@github.com:fluencelabs/randomx-rust-wrapper.git
