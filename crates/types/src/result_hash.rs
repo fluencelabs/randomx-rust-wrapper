@@ -36,19 +36,17 @@ impl ResultHash {
     pub fn into_slice(self) -> ResultHashInner {
         self.0
     }
-
-    pub(crate) fn empty() -> Self {
-        Self([0u8; RANDOMX_RESULT_SIZE])
-    }
-
-    pub(crate) fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
-        self.0.as_mut_ptr() as *mut std::ffi::c_void
-    }
 }
 
 impl AsRef<ResultHashInner> for ResultHash {
     fn as_ref(&self) -> &ResultHashInner {
         &self.0
+    }
+}
+
+impl AsMut<ResultHashInner> for ResultHash {
+    fn as_mut(&mut self) -> &mut ResultHashInner {
+        &mut self.0
     }
 }
 
