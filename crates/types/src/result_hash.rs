@@ -15,6 +15,7 @@
  */
 
 use hex::FromHex;
+use hex::ToHex;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -54,5 +55,15 @@ impl FromHex for ResultHash {
 
     fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
         ResultHashInner::from_hex(hex).map(Self)
+    }
+}
+
+impl ToHex for ResultHash {
+    fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
+        ToHex::encode_hex(&self.0)
+    }
+
+    fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
+        ToHex::encode_hex_upper(&self.0)
     }
 }
