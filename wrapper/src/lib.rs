@@ -43,7 +43,7 @@ pub use dataset::Dataset;
 pub use errors::RandomXError;
 pub use errors::VmCreationError;
 pub use flags::RandomXFlags;
-pub use randomx_rust_wrapper_types::ResultHash;
+pub use result_hash::ResultHash;
 pub use vm::RandomXVM;
 
 macro_rules! try_alloc {

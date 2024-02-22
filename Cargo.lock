@@ -15,6 +15,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f9fa1897e4325be0d68d48df6aa1a71ac2ed4d27723887e7754192705350730"
 
 [[package]]
+name = "ccp-randomx"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "ccp-randomx-types",
+ "cmake",
+ "hex",
+ "libc",
+ "rand",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "ccp-randomx-types"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -104,28 +126,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
-]
-
-[[package]]
-name = "randomx-rust-wrapper"
-version = "0.5.0"
-dependencies = [
- "bitflags",
- "cmake",
- "hex",
- "libc",
- "rand",
- "randomx-rust-wrapper-types",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "randomx-rust-wrapper-types"
-version = "0.1.0"
-dependencies = [
- "hex",
- "serde",
 ]
 
 [[package]]
