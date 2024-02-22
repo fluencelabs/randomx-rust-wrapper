@@ -1,7 +1,7 @@
 [package]
 name = "ccp-randomx"
 version = "0.1.0"
-description = "RandomX Rust wrapper intended for Fluence Capacity Commitment protocol"
+description = "RandomX Rust wrapper intended for the Fluence Capacity Commitment protocol"
 authors = ["Fluence Labs"]
 edition = "2021"
 license = "Apache-2.0"
