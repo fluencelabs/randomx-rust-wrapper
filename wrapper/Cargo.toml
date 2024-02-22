@@ -1,5 +1,5 @@
 [package]
-name = "randomx-rust-wrapper"
+name = "ccp-randomx"
 version = "0.5.0"
 description = "RandomX Rust wrapper intended for Fluence Capacity Commitment prover and verifier"
 authors = ["Fluence Labs"]
@@ -13,7 +13,7 @@ path = "src/lib.rs"
 doctest = false
 
 [dependencies]
-randomx-rust-wrapper-types = { workspace = true }
+ccp-randomx-types = { workspace = true }
 
 bitflags = { workspace = true }
 hex = { workspace = true }

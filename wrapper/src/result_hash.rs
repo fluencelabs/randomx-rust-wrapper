@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-pub use randomx_rust_wrapper_types::ResultHash;
-use randomx_rust_wrapper_types::RANDOMX_RESULT_SIZE;
+pub use ccp_randomx_types::ResultHash;
+pub use ccp_randomx_types::RANDOMX_RESULT_SIZE;
 
 pub(crate) trait ToRawMut {
     fn empty() -> Self;

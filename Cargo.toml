@@ -6,7 +6,7 @@ members = [
 ]
 
 [workspace.dependencies]
-randomx-rust-wrapper-types = { path = "./crates/types", version = "0.1.0" }
+ccp-randomx-types = { path = "./crates/types", version = "0.1.0" }
 
 bitflags = "2.4"
 cmake = "0.1"
