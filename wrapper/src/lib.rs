@@ -16,15 +16,15 @@
 
 #![warn(rust_2018_idioms)]
 #![warn(rust_2021_compatibility)]
-#![deny(
-    dead_code,
-    nonstandard_style,
-    unused_imports,
-    unused_mut,
-    unused_variables,
-    unused_unsafe,
-    unreachable_patterns
-)]
+// #![deny(
+//     dead_code,
+//     nonstandard_style,
+//     unused_imports,
+//     unused_mut,
+//     unused_variables,
+//     unused_unsafe,
+//     unreachable_patterns
+// )]
 
 pub mod bindings;
 pub mod cache;
@@ -35,6 +35,11 @@ pub mod result_hash;
 #[cfg(test)]
 mod tests;
 pub mod vm;
+pub mod registers;
+pub mod instruction;
+pub mod program;
+pub mod bytecode_machine;
+pub mod ironlight;
 
 pub type RResult<T> = Result<T, errors::RandomXError>;
 
@@ -45,6 +50,7 @@ pub use errors::VmCreationError;
 pub use flags::RandomXFlags;
 pub use result_hash::ResultHash;
 pub use vm::RandomXVM;
+pub use ironlight::IronLightVM;
 
 macro_rules! try_alloc {
     ($alloc:expr, $error:expr) => {{

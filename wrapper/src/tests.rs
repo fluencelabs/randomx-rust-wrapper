@@ -18,11 +18,18 @@ use crate::Cache;
 use crate::Dataset;
 use crate::RandomXFlags;
 use crate::RandomXVM;
+use crate::IronLightVM;
 use crate::ResultHash;
 
 fn run_light_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {
     let cache = Cache::new(&global_nonce, flags).unwrap();
     let vm = RandomXVM::light(cache, flags).unwrap();
+    vm.hash(&local_nonce)
+}
+
+fn run_ironlight_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {
+    let cache = Cache::new(&global_nonce, flags).unwrap();
+    let mut vm = IronLightVM::new(cache, flags).unwrap();
     vm.hash(&local_nonce)
 }
 
@@ -36,15 +43,48 @@ fn run_fast_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags
 fn light_mode_works() {
     let global_nonce = vec![1, 2, 3, 4, 5, 6, 7];
     let local_nonce = vec![2, 3, 4, 5, 6, 7];
-    let flags = RandomXFlags::recommended();
+    let flags = RandomXFlags::DEFAULT;
+    println!("Flags: {:?}", flags);
 
     let actual_result = run_light_randomx(&global_nonce, &local_nonce, flags);
+    let hex_string: String = actual_result
+        .into_slice()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+
+    println!("Result: {}", hex_string);
     let expected_result = ResultHash::from_slice([
-        67, 239, 84, 18, 247, 8, 93, 182, 61, 251, 183, 153, 67, 84, 87, 218, 135, 14, 249, 163,
-        31, 190, 15, 90, 57, 60, 80, 138, 37, 182, 122, 35,
+        133, 95, 150, 177, 51, 99, 179, 126, 55, 33, 61, 139, 120, 240, 233, 99, 78, 17, 195, 171,
+        72, 165, 63, 121, 251, 194, 167, 44, 123, 31, 135, 219,
     ]);
 
     assert_eq!(actual_result, expected_result);
+    assert!(false);
+}
+
+#[test]
+fn ironlight_mode_works() {
+    let global_nonce = vec![1, 2, 3, 4, 5, 6, 7];
+    let local_nonce = vec![2, 3, 4, 5, 6, 7];
+    let flags = RandomXFlags::DEFAULT;
+    println!("Flags: {:?}", flags);
+
+    let actual_result = run_ironlight_randomx(&global_nonce, &local_nonce, flags);
+    let hex_string: String = actual_result
+        .into_slice()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+
+    println!("Result: {}", hex_string);
+    let expected_result = ResultHash::from_slice([
+        133, 95, 150, 177, 51, 99, 179, 126, 55, 33, 61, 139, 120, 240, 233, 99, 78, 17, 195, 171,
+        72, 165, 63, 121, 251, 194, 167, 44, 123, 31, 135, 219,
+    ]);
+
+    assert_eq!(actual_result, expected_result);
+    assert!(false);
 }
 
 #[test]

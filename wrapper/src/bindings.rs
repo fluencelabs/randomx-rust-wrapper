@@ -85,6 +85,10 @@ pub mod cache {
     }
 }
 
+pub mod program {
+    static RANDOMX_PROGRAM_SIZE: usize = 256;
+}
+
 pub mod dataset {
     use super::cache::randomx_cache;
     use super::flags::randomx_flags;
@@ -280,3 +284,27 @@ pub mod vm {
         );
     }
 }
+
+pub mod entropy {
+    extern "C" {
+        pub fn randomx_blake2b(out: *mut ::std::os::raw::c_void, outlen: usize, in_ptr: *const ::std::os::raw::c_void, inlen: usize,
+            key: *const ::std::os::raw::c_void, keylen: usize);
+    }
+
+    extern "C" {
+        pub fn randomx_fill_aes_1rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+    }
+
+    extern "C" {
+        pub fn randomx_fill_aes_4rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+    }
+}
+
+pub mod float_rounding {
+    extern "C" {
+        pub fn randomx_reset_rounding_mode();
+    }
+}
+
+// int blake2b(void *out, size_t outlen, const void *in, size_t inlen,
+//     const void *key, size_t keylen);
