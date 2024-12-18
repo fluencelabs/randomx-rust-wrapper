@@ -119,10 +119,6 @@ impl Program {
         }
         result
     }
-
-    pub fn compile(&self) -> BytecodeMachine {
-        BytecodeMachine::empty()
-    }
 }
 
 impl fmt::Display for Program {

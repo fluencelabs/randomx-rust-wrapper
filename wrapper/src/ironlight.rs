@@ -20,7 +20,11 @@ use crate::{
     bindings::{
         entropy::{randomx_blake2b, randomx_fill_aes_1rx4},
         float_rounding::randomx_reset_rounding_mode,
-    }, bytecode_machine, program::RANDOMX_PROGRAM_ITERATIONS, registers::{self, FpuRegister, MemoryRegisters, NativeRegisterFile}, result_hash::ToRawMut
+    },
+    bytecode_machine::{self, BytecodeMachine},
+    program::RANDOMX_PROGRAM_ITERATIONS,
+    registers::{self, FpuRegister, MemoryRegisters, NativeRegisterFile},
+    result_hash::ToRawMut,
 };
 use ccp_randomx_types::ResultHash;
 
@@ -31,11 +35,16 @@ use crate::{
     RResult, RandomXFlags, VmCreationError,
 };
 
-static RANDOMX_SCRATCHPAD_L2: usize = 2097152;
+pub static RANDOMX_SCRATCHPAD_L1: usize = 16384;
+pub static RANDOMX_SCRATCHPAD_L2: usize = 262144;
+pub static RANDOMX_SCRATCHPAD_L3: usize = 2097152;
+pub static RANDOMX_JUMP_OFFSET: i32 = 8;
+pub static RANDOMX_JUMP_BITS: u32 = 8;
 
 // WIP
-#[repr(align(16))]
+#[repr(C, align(16))]
 pub struct Aligned16(pub [u64; 8]);
+
 const MANTISSA_MASK: u64 = 0x000F_FFFF_FFFF_FFFF;
 const EXPONENT_BIAS: u64 = 0x3ff;
 const EXPONENT_MASK: u64 = 0x7ff;
@@ -75,7 +84,7 @@ pub struct IronLightVM<T> {
     reg: RegisterFile,
     mem: MemoryRegisters,
     config: ProgramConfiguration,
-    scratchpad: Vec<u8>,
+    scratchpad: Vec<u8>, // replace with Box<[u8]> || aligned_alloc prims
     cache_key: String,
     temp_hash: [u64; 8],
     randomx_cache: T,
@@ -90,7 +99,7 @@ impl<T: CacheRawAPI> IronLightVM<T> {
         }
 
         let config = ProgramConfiguration::default();
-        let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L2];
+        let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
         let reg = RegisterFile::default();
         let temp_hash = [0; 8];
         let cache_key = String::new();
@@ -184,13 +193,15 @@ impl<T: CacheRawAPI> IronLightVM<T> {
 
     fn execute(&mut self, program: &Program) {
         let mut nreg = NativeRegisterFile::from_fp_registers(&self.reg.a);
-        let bytecode_machine = program.compile();
+
+        let bytecode_machine =
+            BytecodeMachine::from_instructions_and_nreg(program.program_buffer.iter(), &mut nreg);
 
         let sp_addr_0 = self.mem.mx;
-		let sp_addr_1 = self.mem.ma;
+        let sp_addr_1 = self.mem.ma;
 
         for _ in 0..RANDOMX_PROGRAM_ITERATIONS {
-            // do something
+            // do something with bytecode_machine
         }
 
         self.reg.r = nreg.r;
@@ -218,7 +229,7 @@ impl<T: CacheRawAPI> IronLightVM<T> {
         let seed = seed.0.as_mut_ptr() as *mut std::ffi::c_void;
         let scratchpad = self.scratchpad.as_mut_ptr() as *mut std::ffi::c_void;
         unsafe {
-            randomx_fill_aes_1rx4(seed, RANDOMX_SCRATCHPAD_L2, scratchpad);
+            randomx_fill_aes_1rx4(seed, RANDOMX_SCRATCHPAD_L3, scratchpad);
         }
     }
 }

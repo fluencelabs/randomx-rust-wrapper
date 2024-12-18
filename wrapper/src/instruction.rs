@@ -15,53 +15,20 @@
  */
 use std::fmt;
 
-// Типы инструкций
-#[derive(Debug, Clone, Copy)]
-pub enum InstructionType {
-    IAddRs,
-    IAddM,
-    ISubR,
-    ISubM,
-    IMulR,
-    IMulM,
-    IMulhR,
-    IMulhM,
-    ISMulhR,
-    ISMulhM,
-    IMulRcp,
-    INegR,
-    IXorR,
-    IXorM,
-    IRorR,
-    IRolR,
-    ISwapR,
-    FSwapR,
-    FAddR,
-    FAddM,
-    FSubR,
-    FSubM,
-    FScalR,
-    FMulR,
-    FDivM,
-    FSqrtR,
-    CBranch,
-    CFround,
-    IStore,
-    Nop,
-}
+
 
 // WIP align is questionable here
 #[repr(C, align(8))]
 #[derive(Debug, Copy, Clone)]
 pub struct Instruction {
-    pub opcode: InstructionType,
+    pub opcode: u8,
     pub dst: u8,
     pub src: u8,
     pub mod_: u8,
     pub imm32: u32,
 }
 
-const NAMES_FREQS: [(&str, u8); 30] = [
+pub const NAMES_FREQS: [(&str, u8); 30] = [
     ("IADD_RS",    16),
     ("IADD_M",      7),
     ("ISUB_R",     16),
@@ -114,7 +81,7 @@ const fn build_instruction_array() -> [&'static str; 256] {
 const INSTR_NAMES: [&str; 256] = build_instruction_array();
 
 impl Instruction {
-    pub fn new(opcode: InstructionType, dst: u8, src: u8, mod_: u8, imm32: u32) -> Self {
+    pub fn new(opcode: u8, dst: u8, src: u8, mod_: u8, imm32: u32) -> Self {
         Self {
             opcode,
             dst,
@@ -136,12 +103,13 @@ impl Instruction {
         self.mod_ & 0b11
     }
 
+    // WIP double check the intermediate results
     pub fn get_mod_shift(&self) -> u8 {
         (self.mod_ >> 2) & 0b11
     }
 
-    pub fn get_mod_cond(&self) -> u8 {
-        self.mod_ >> 4
+    pub fn get_mod_cond(&self) -> i32 {
+        (self.mod_ >> 4) as i32
     }
 
     pub fn set_mod(&mut self, val: u8) {
@@ -178,7 +146,7 @@ impl Instruction {
 impl Default for Instruction {
     fn default() -> Self {
         Self {
-            opcode: InstructionType::Nop,
+            opcode: 0,
             dst: 0,
             src: 0,
             mod_: 0,

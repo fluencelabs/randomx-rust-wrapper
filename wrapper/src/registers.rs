@@ -26,8 +26,8 @@ type IntRegister = u64;
 type Addr = u32;
 pub type NativeFpuRegister = __m128d;
 
-static REGISTER_COUNT: usize = 8;
-static REGISTER_COUNT_FLT: usize = REGISTER_COUNT / 2;
+pub static REGISTER_COUNT: usize = 8;
+pub static REGISTER_COUNT_FLT: usize = REGISTER_COUNT / 2;
 const CACHE_LINE_ALIGN_MASK: Addr = 0xffffffc0;
 
 #[repr(C, align(16))]
@@ -57,6 +57,7 @@ pub struct NativeRegisterFile {
     pub e: [NativeFpuRegister; REGISTER_COUNT_FLT],
     pub a: [NativeFpuRegister; REGISTER_COUNT_FLT],
 }
+
 impl NativeRegisterFile {
     pub(crate) fn from_fp_registers(a_fpu_regs: &[FpuRegister; REGISTER_COUNT_FLT]) -> Self {
         let zeros: NativeFpuRegister;
