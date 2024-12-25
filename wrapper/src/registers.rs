@@ -21,12 +21,15 @@ use std::{
 
 use crate::{bindings::cache::randomx_cache, intrinsics::{rx_store_fpu_as_vec_f128, rx_store_vec_f128, NativeFpuRegister}};
 
-type IntRegister = u64;
-type Addr = u32;
-
 pub static REGISTER_COUNT: usize = 8;
 pub static REGISTER_COUNT_FLT: usize = REGISTER_COUNT / 2;
 const CACHE_LINE_ALIGN_MASK: Addr = 0xffffffc0;
+
+type IntRegister = u64;
+pub type IntRegisterArray = [IntRegister; REGISTER_COUNT];
+type Addr = u32;
+
+
 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]
@@ -50,7 +53,7 @@ impl Default for FpuRegister {
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]
 pub struct NativeRegisterFile {
-    pub r: [IntRegister; REGISTER_COUNT],
+    pub r: IntRegisterArray,
     pub f: [NativeFpuRegister; REGISTER_COUNT_FLT],
     pub e: [NativeFpuRegister; REGISTER_COUNT_FLT],
     pub a: [NativeFpuRegister; REGISTER_COUNT_FLT],

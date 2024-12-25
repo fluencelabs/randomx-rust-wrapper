@@ -19,15 +19,18 @@ use std::{fs::File, io::Write, os::raw::c_void, ptr};
 
 use crate::{
     bindings::{
-        entropy::{randomx_blake2b, randomx_fill_aes_1rx4, randomx_hash_aes_1rx4},
-        float_rounding::randomx_reset_rounding_mode,
+        cache::randomx_cache, dataset::randomx_init_dataset_item, entropy::{randomx_blake2b, randomx_fill_aes_1rx4, randomx_hash_aes_1rx4}, float_rounding::randomx_reset_rounding_mode
     },
     bytecode_machine::{self, BytecodeMachine, BytecodeStorage, InstructionByteCode},
     constants::{CACHE_LINE_ALIGN_MASK, RANDOMX_SCRATCHPAD_L3, SCRATCHPAD_L3_MASK64},
-    intrinsics::{mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_store_vec_f128, rx_xor_vec_f128, NativeFpuRegister},
+    intrinsics::{
+        mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_store_vec_f128,
+        rx_xor_vec_f128, NativeFpuRegister,
+    },
     program::{RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE},
     registers::{
-        self, FpuRegister, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT, REGISTER_COUNT_FLT,
+        self, FpuRegister, IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT,
+        REGISTER_COUNT_FLT,
     },
     result_hash::ToRawMut,
 };
@@ -78,6 +81,25 @@ fn get_float_mask(entropy: u64) -> u64 {
     (entropy & MASK_22BIT) | get_static_exponent(entropy)
 }
 
+fn dataset_read(cache: *const randomx_cache, address: usize, r: &IntRegisterArray) -> IntRegisterArray {
+    let item_number = (address / CACHE_LINE_SIZE) as u64;
+    let mut rl: IntRegisterArray = [0; REGISTER_COUNT];
+    let rl_ptr = rl.as_ptr() as *mut c_void;
+
+    println!("dataset_read r: {:?}", r);
+
+    unsafe {
+        randomx_init_dataset_item(cache, rl_ptr, item_number);
+    }
+
+    for i in 0..REGISTER_COUNT {
+        rl[i] = r[i] ^ rl[i];
+    }
+    println!("dataset_read rl: {:?}", rl);
+
+    rl
+}
+
 pub struct IronLightVM<T> {
     // program: Program,
     reg: RegisterFile,
@@ -91,7 +113,10 @@ pub struct IronLightVM<T> {
     bytecode: BytecodeStorage,
 }
 
-impl<T: CacheRawAPI> IronLightVM<T> {
+impl<T: CacheRawAPI> IronLightVM<T>
+where
+    T: CacheRawAPI,
+{
     pub fn new(randomx_cache: T, flags: RandomXFlags) -> RResult<Self> {
         if !flags.is_light_mode() {
             // WIP
@@ -105,7 +130,7 @@ impl<T: CacheRawAPI> IronLightVM<T> {
         let cache_key = String::new();
         let mem = MemoryRegisters::default();
         let dataset_offset = 0;
-        let bytecode = [InstructionByteCode::default(); RANDOMX_PROGRAM_SIZE]; 
+        let bytecode = [InstructionByteCode::default(); RANDOMX_PROGRAM_SIZE];
 
         let vm = Self {
             mem,
@@ -195,11 +220,16 @@ impl<T: CacheRawAPI> IronLightVM<T> {
         );
     }
 
+
+
     fn execute(&mut self, program: &Program) {
         let mut nreg = NativeRegisterFile::from_fp_registers(&self.reg.a);
 
-        let bytecode_machine =
-            BytecodeMachine::from_components(&program.program_buffer, &mut nreg, &mut self.bytecode);
+        let bytecode_machine = BytecodeMachine::from_components(
+            &program.program_buffer,
+            &mut nreg,
+            &mut self.bytecode,
+        );
 
         // WIP types
         let mut sp_addr0 = self.mem.mx as u64;
@@ -263,8 +293,10 @@ impl<T: CacheRawAPI> IronLightVM<T> {
             // prefetch
             // read into nreg.r
             // dataset_read
+            let dataset_offset = self.dataset_offset + self.mem.ma as usize;
+            nreg.r = dataset_read(self.randomx_cache.raw(), dataset_offset, &nreg.r);
             std::mem::swap(&mut self.mem.mx, &mut self.mem.ma);
-            
+
             for i in 0..REGISTER_COUNT {
                 let entropy_address = sp_addr1 as usize + 8usize * i;
                 let scratchpad_entropy =
@@ -280,11 +312,10 @@ impl<T: CacheRawAPI> IronLightVM<T> {
             }
 
             for i in 0..REGISTER_COUNT_FLT {
-                    // scratchpad + spAddr0 + 16 * i
+                // scratchpad + spAddr0 + 16 * i
                 let entropy_address = sp_addr0 as usize + 16usize * i;
-                let scratchpad_dst =
-                    &mut self.scratchpad[entropy_address] as *mut u8 as *mut f64;
-                    rx_store_vec_f128(scratchpad_dst, &nreg.f[i]);
+                let scratchpad_dst = &mut self.scratchpad[entropy_address] as *mut u8 as *mut f64;
+                rx_store_vec_f128(scratchpad_dst, &nreg.f[i]);
             }
 
             sp_addr0 = 0;
@@ -292,12 +323,9 @@ impl<T: CacheRawAPI> IronLightVM<T> {
         }
 
         self.reg.r = nreg.r;
-    
 
         self.reg.store_fpu_f(&nreg.f);
         self.reg.store_fpu_e(&nreg.e);
-
-      
     }
 
     fn generate_and_run(&mut self, seed: &mut Aligned16) {
