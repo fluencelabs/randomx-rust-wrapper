@@ -90,6 +90,8 @@ pub mod program {
 }
 
 pub mod dataset {
+    use std::os::raw::c_void;
+
     use super::cache::randomx_cache;
     use super::flags::randomx_flags;
 
@@ -155,6 +157,10 @@ pub mod dataset {
           @param dataset is a pointer to a previously allocated randomx_dataset structure.\
         "]
         pub fn randomx_release_dataset(dataset: *mut randomx_dataset);
+    }
+
+    extern "C" {
+        pub fn randomx_init_dataset_item(cache: *const randomx_cache, out: *mut c_void, item_number: u64);
     }
 }
 
@@ -296,15 +302,21 @@ pub mod entropy {
     }
 
     extern "C" {
+        pub fn randomx_hash_aes_1rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+    }
+
+    extern "C" {
         pub fn randomx_fill_aes_4rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
     }
 }
 
+// WIP mb remove this one
 pub mod float_rounding {
     extern "C" {
         pub fn randomx_reset_rounding_mode();
     }
 }
+
 
 // int blake2b(void *out, size_t outlen, const void *in, size_t inlen,
 //     const void *key, size_t keylen);

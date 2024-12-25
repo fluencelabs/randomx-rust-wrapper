@@ -35,10 +35,12 @@ pub mod result_hash;
 #[cfg(test)]
 mod tests;
 pub mod vm;
+pub mod constants;
 pub mod registers;
 pub mod instruction;
 pub mod program;
 pub mod bytecode_machine;
+pub mod intrinsics;
 pub mod ironlight;
 
 pub type RResult<T> = Result<T, errors::RandomXError>;

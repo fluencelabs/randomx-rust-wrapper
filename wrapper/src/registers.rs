@@ -19,12 +19,10 @@ use std::{
     ops::BitAndAssign,
 };
 
-use crate::bindings::cache::randomx_cache;
-use core::arch::x86_64::__m128d;
+use crate::{bindings::cache::randomx_cache, intrinsics::{rx_store_fpu_as_vec_f128, rx_store_vec_f128, NativeFpuRegister}};
 
 type IntRegister = u64;
 type Addr = u32;
-pub type NativeFpuRegister = __m128d;
 
 pub static REGISTER_COUNT: usize = 8;
 pub static REGISTER_COUNT_FLT: usize = REGISTER_COUNT / 2;
@@ -61,26 +59,35 @@ pub struct NativeRegisterFile {
 impl NativeRegisterFile {
     pub(crate) fn from_fp_registers(a_fpu_regs: &[FpuRegister; REGISTER_COUNT_FLT]) -> Self {
         let zeros: NativeFpuRegister;
-        let f: [NativeFpuRegister; REGISTER_COUNT_FLT];
+        let a: [NativeFpuRegister; REGISTER_COUNT_FLT];
         unsafe {
             zeros = _mm_setzero_pd();
-            f = std::array::from_fn(|i| {
+            a = std::array::from_fn(|i| {
                 _mm_load_pd(&a_fpu_regs[i] as *const FpuRegister as *const f64)
             });
         }
 
         Self {
             r: [0; REGISTER_COUNT],
-            f,
+            f: [zeros; REGISTER_COUNT_FLT],
             e: [zeros; REGISTER_COUNT_FLT],
-            a: [zeros; REGISTER_COUNT_FLT],
+            a,
         }
     }
 }
 
-fn store_fpu_register(dst: &mut FpuRegister, src: &NativeFpuRegister) {
-    unsafe {
-        _mm_store_pd(dst as *mut FpuRegister as *mut f64, *src);
+impl Default for NativeRegisterFile {
+    fn default() -> Self {
+        let zeros: NativeFpuRegister;
+        unsafe {
+            zeros = _mm_setzero_pd();
+        }
+        Self {
+            r: [0; REGISTER_COUNT],
+            f: [zeros; REGISTER_COUNT_FLT],
+            e: [zeros; REGISTER_COUNT_FLT],
+            a: [zeros; REGISTER_COUNT_FLT],
+        }
     }
 }
 
@@ -89,7 +96,7 @@ pub fn store_fpu_registers_array(
     src: &[NativeFpuRegister; REGISTER_COUNT_FLT],
 ) {
     for i in 0..REGISTER_COUNT_FLT {
-        store_fpu_register(&mut dst[i], &src[i]);
+        rx_store_fpu_as_vec_f128(&mut dst[i], &src[i]);
     }
 }
 
@@ -116,7 +123,7 @@ impl Default for RegisterFile {
 impl RegisterFile {
     pub fn initialise_fpu_a(&mut self, entropy: &Vec<f64>) {
         for i in 0..REGISTER_COUNT_FLT {
-            self.a[i] = FpuRegister::new(entropy[i], entropy[i + 1]);
+            self.a[i] = FpuRegister::new(entropy[i*2], entropy[i*2 + 1]);
         }
     }
 

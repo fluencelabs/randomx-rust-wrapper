@@ -82,6 +82,13 @@ fn ironlight_mode_works() {
         133, 95, 150, 177, 51, 99, 179, 126, 55, 33, 61, 139, 120, 240, 233, 99, 78, 17, 195, 171,
         72, 165, 63, 121, 251, 194, 167, 44, 123, 31, 135, 219,
     ]);
+    let hex_string: String = expected_result
+        .into_slice()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    println!("Expected result: {}", hex_string);
+
 
     assert_eq!(actual_result, expected_result);
     assert!(false);

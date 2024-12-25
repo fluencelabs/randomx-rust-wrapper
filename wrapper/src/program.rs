@@ -69,11 +69,13 @@ impl ProgramConfiguration {
     }
 }
 
+pub type InstructionsStorage = [Instruction; RANDOMX_PROGRAM_SIZE];
+
 #[repr(C, align(64))]
 #[derive(Debug, Clone, Copy)]
 pub struct Program {
     pub entropy_buffer: [u64; 16],
-    pub program_buffer: [Instruction; RANDOMX_PROGRAM_SIZE],
+    pub program_buffer: InstructionsStorage,
 }
 
 impl Program {
