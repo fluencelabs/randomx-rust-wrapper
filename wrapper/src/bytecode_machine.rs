@@ -753,7 +753,7 @@ impl InstructionByteCode {
         register_usage: &mut RegistersCount,
     ) {
         let opcode = instr.opcode as i16;
-        println!("pc {} opcode: {}", pc, opcode);
+        // println!("pc {} opcode: {}", pc, opcode);
 
         // let mut instr_type = InstructionType::Nop;
         // let mut imm: u64 = 0;
@@ -818,14 +818,17 @@ impl InstructionByteCode {
             self.instr_type = InstructionType::ISubR;
             self.idst = &mut nreg.r[dst];
             register_usage[dst] = pc;
-
             if src != dst {
                 self.isrc = &nreg.r[src];
+                // println!("PC {} ISUB_R 1 src {} dst {} ", pc, src, dst);
+
                 return; // return bc(
                         //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
                         // );
             } else {
                 self.imm = sign_extend2s_compl(instr.get_imm32());
+                // println!("PC {} ISUB_R 1 src {} dst {} imm {}", pc, src, dst, self.imm);
+
                 self.isrc = &self.imm;
                 return; // return bc_imm_replaces_isrc(
                         //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
@@ -863,7 +866,7 @@ impl InstructionByteCode {
         if opcode < CEIL_IMUL_R {
             let dst = instr.dst as usize % REGISTER_COUNT;
             let src = instr.src as usize % REGISTER_COUNT;
-            println!("IMUL_R");
+            // println!("IMUL_R");
             self.instr_type = InstructionType::IMulR;
             register_usage[dst] = pc;
 
@@ -876,7 +879,7 @@ impl InstructionByteCode {
             } else {
                 self.imm = sign_extend2s_compl(instr.get_imm32());
                 self.isrc = &self.imm;
-                println!("IMUL_R imm: {}", self.imm);
+                // println!("IMUL_R imm: {}", self.imm);
                 // bc_imm_replaces_isrc(instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask)
             };
         }
@@ -975,7 +978,7 @@ impl InstructionByteCode {
         }
 
         if opcode < CEIL_IMUL_RCP {
-            println!("IMUL_RCP");
+            // println!("IMUL_RCP");
             let divisor = instr.get_imm32() as u32;
             if !(divisor.is_power_of_two() || divisor == 0) {
                 let dst = instr.dst as usize % REGISTER_COUNT;
@@ -987,12 +990,12 @@ impl InstructionByteCode {
                 // let bc = bc_imm_replaces_isrc(
                 //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
                 // );
-                unsafe {
-                    println!(
-                        "IMUL_RCP dst {} imm: {} bc.isrc {} *bc.isrc {}",
-                        dst, self.imm, self.isrc as u64, *self.isrc
-                    );
-                }
+                // unsafe {
+                //     println!(
+                //         "IMUL_RCP dst {} imm: {} bc.isrc {} *bc.isrc {}",
+                //         dst, self.imm, self.isrc as u64, *self.isrc
+                //     );
+                // }
                 // return bc;
             } else {
                 self.instr_type = InstructionType::Nop;
@@ -1053,7 +1056,7 @@ impl InstructionByteCode {
                 self.isrc = &ZERO;
                 self.mem_mask = SCRATCHPAD_L3_MASK;
             }
-            // register_usage[dst] = pc;
+            register_usage[dst] = pc;
             return; // return bc(
                     //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
                     // );
@@ -1240,6 +1243,7 @@ impl InstructionByteCode {
             let creg = instr.dst as usize % REGISTER_COUNT;
             self.idst = &mut nreg.r[creg];
             self.target = register_usage[creg] as i16;
+            // println!("compile CBRANCH i {} {} {:?}", pc, creg, register_usage);
             let cond_shift = instr.get_mod_cond() + CONDITION_OFFSET;
             self.imm = sign_extend2s_compl(instr.get_imm32() | (1 << cond_shift));
             if CONDITION_OFFSET > 0 || cond_shift > 0 {
@@ -1315,14 +1319,14 @@ impl InstructionByteCode {
     }
 
     fn execute(&self, pc: i16, scratchpad: &[u8], config_entropy: &[u64; 2]) -> i16 {
-        let mut new_pc = pc + 1;
+        let mut new_pc = pc;
         // println!("instr_type: {:?}", self.instr_type);
-        println!("execute bc {:?}", self);
+        // println!("execute bc {:?}", self);
         unsafe {
             match self.instr_type {
                 InstructionType::IAddRs => {
                     let a = (*self.isrc << self.shift).wrapping_add(self.imm);
-                    println!("IAddRs idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
+                    // println!("IAddRs idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
                     *self.idst = (*self.idst).wrapping_add(a)
                 }
                 InstructionType::IAddM => {
@@ -1330,17 +1334,17 @@ impl InstructionByteCode {
                 }
                 InstructionType::ISubR => {
                     let a = (*self.idst).wrapping_sub(*self.isrc);
-                    // println!("idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
+                    // println!("ISubR idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
                     *self.idst = (*self.idst).wrapping_sub(*self.isrc);
                 }
                 InstructionType::ISubM => {
                     *self.idst = (*self.idst).wrapping_sub(self.get_u64_from_scratchpad(scratchpad))
                 }
                 InstructionType::IMulR | InstructionType::IMulRcp => {
-                    println!(
-                        "*idst: {}, *isrc: {} isrc {}, imm {}",
-                        *self.idst, *self.isrc, self.isrc as u64, self.imm
-                    );
+                    // println!(
+                        // "*idst: {}, *isrc: {} isrc {}, imm {}",
+                        // *self.idst, *self.isrc, self.isrc as u64, self.imm
+                    // );
                     *self.idst = (*self.idst).wrapping_mul(*self.isrc)
                 }
                 InstructionType::IMulM => {
@@ -1385,7 +1389,7 @@ impl InstructionByteCode {
                 InstructionType::FAddR => {
                     let a = *self.fdst;
                     *self.fdst = rx_add_vec_f128(*self.fdst, *self.fsrc);
-                    println!("FAddR orig fdst {:?} fsrc: {:?} fdst: {:?},  ", a, *self.fsrc, *self.fdst);
+                    // println!("FAddR orig fdst {:?} fsrc: {:?} fdst: {:?},  ", a, *self.fsrc, *self.fdst);
                 }
                 InstructionType::FAddM => {
                     let fsrc = rx_cvt_packed_int_vec_f128(self.get_scratchpad_address(scratchpad));
@@ -1410,9 +1414,10 @@ impl InstructionByteCode {
                 }
                 InstructionType::FSqrtR => *self.fdst = rx_sqrt_vec_f128(*self.fdst),
                 InstructionType::CBranch => {
-                    println!("CBranch idst: {}, imm {}", *self.idst, self.imm);
+                    // println!("CBranch idst: {}, imm {} mem_mask {}", *self.idst, self.imm, self.mem_mask);
                     *self.idst = (*self.idst).wrapping_add(self.imm);
                     if (*self.idst & self.mem_mask as u64) == 0 {
+                        // println!("CBranch target {}", self.target);
                         new_pc = self.target;
                     }
                 }
@@ -1505,21 +1510,23 @@ impl<'bytecode> BytecodeMachine<'bytecode> {
         scratchpad: &[u8],
         config_entropy: &[u64; 2],
         _nreg: &NativeRegisterFile,
+        _ic: usize,
     ) {
         let mut pc = 0;
-        let mut original_pc = 0; // WIP
+        // let mut original_pc = 0; // WIP
         let bytecode_len = self.bytecode.len() as i16;
-        // while 0 <= pc && pc < 20 {
         while 0 <= pc && pc < bytecode_len {
-            // println!("PC: {}", pc);
             let ibc = &self.bytecode[pc as usize];
             pc = ibc.execute(pc, scratchpad, config_entropy);
-            // println!(
-            //     "execute PC {:} after bc exec nreg.e[0]:  {:?}",
-            //     original_pc, nreg.e[0]
-            // );
-
-            original_pc = pc;
+            // if _ic == 197 {
+            //     println!(
+            //         "execute PC {:} after bc exec nreg.r[0]:  {:?} {:?}",
+            //         pc, _nreg.r[0], ibc,
+            //     );
+            // }
+            
+            // original_pc = pc;
+            pc += 1;
         }
     }
 }

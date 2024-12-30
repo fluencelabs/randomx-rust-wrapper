@@ -20,6 +20,7 @@ use std::fmt;
 
 pub(crate) static RANDOMX_PROGRAM_SIZE: usize = 256;
 pub(crate) static RANDOMX_PROGRAM_ITERATIONS: usize = 2048;
+pub(crate) static RANDOMX_PROGRAM_COUNT: usize = 8;
 
 // WIP
 #[repr(C, align(16))]
