@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-use std::{
-    arch::x86_64::{_mm_load_pd, _mm_setzero_pd, _mm_store_pd},
-    ops::BitAndAssign,
-};
+use std::
+    arch::x86_64::{_mm_load_pd, _mm_setzero_pd};
 
-use crate::{bindings::cache::randomx_cache, intrinsics::{rx_store_fpu_as_vec_f128, rx_store_vec_f128, NativeFpuRegister}};
+use crate::intrinsics::{rx_store_fpu_as_vec_f128, NativeFpuRegister};
 
 pub static REGISTER_COUNT: usize = 8;
 pub static REGISTER_COUNT_FLT: usize = REGISTER_COUNT / 2;
@@ -143,7 +141,6 @@ impl RegisterFile {
 pub(crate) struct MemoryRegisters {
     pub(crate) mx: Addr,
     pub(crate) ma: Addr,
-    pub(crate) memory: *mut randomx_cache,
 }
 
 impl Default for MemoryRegisters {
@@ -151,14 +148,12 @@ impl Default for MemoryRegisters {
         Self {
             mx: 0,
             ma: 0,
-            memory: std::ptr::null_mut(),
         }
     }
 }
 
 impl MemoryRegisters {
     pub fn initialise_mem(&mut self, ma: u64, mx: u64) {
-        // WIP check
         self.ma = ma as u32 & CACHE_LINE_ALIGN_MASK;
         self.mx = mx as u32;
     }

@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 use crate::{
-    bindings::entropy::randomx_fill_aes_4rx4, bytecode_machine::BytecodeMachine, instruction::Instruction, ironlight::Aligned16
+    bindings::entropy::randomx_fill_aes_4rx4, instruction::Instruction, ironlight::Aligned16
 };
+
 use std::fmt;
 
 pub(crate) static RANDOMX_PROGRAM_SIZE: usize = 256;
 pub(crate) static RANDOMX_PROGRAM_ITERATIONS: usize = 2048;
 pub(crate) static RANDOMX_PROGRAM_COUNT: usize = 8;
+pub(crate) static PROGRAM_ENTROPY_BUFFER_SIZE: usize = 16;
 
-// WIP
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]
 pub struct ProgramConfiguration {
@@ -75,14 +77,14 @@ pub type InstructionsStorage = [Instruction; RANDOMX_PROGRAM_SIZE];
 #[repr(C, align(64))]
 #[derive(Debug, Clone, Copy)]
 pub struct Program {
-    pub entropy_buffer: [u64; 16],
+    pub entropy_buffer: [u64; PROGRAM_ENTROPY_BUFFER_SIZE],
     pub program_buffer: InstructionsStorage,
 }
 
 impl Program {
     pub fn new() -> Self {
         Self {
-            entropy_buffer: [0; 16],
+            entropy_buffer: [0; PROGRAM_ENTROPY_BUFFER_SIZE],
             program_buffer: [Instruction::default(); RANDOMX_PROGRAM_SIZE],
         }
     }

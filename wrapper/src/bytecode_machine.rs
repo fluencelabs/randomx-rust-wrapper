@@ -15,8 +15,8 @@
  */
 
 use std::cell::UnsafeCell;
+use std::os::raw::c_void;
 use std::ptr::{null, null_mut};
-use std::{os::raw::c_void, slice::Iter};
 
 use crate::program::{InstructionsStorage, RANDOMX_PROGRAM_SIZE};
 use crate::{
@@ -64,17 +64,6 @@ const CEIL_CBRANCH: i16 = CEIL_FSQRT_R + NAMES_FREQS[26].1 as i16;
 const CEIL_CFROUND: i16 = CEIL_CBRANCH + NAMES_FREQS[27].1 as i16;
 const CEIL_ISTORE: i16 = CEIL_CFROUND + NAMES_FREQS[28].1 as i16;
 const CEIL_NOP: i16 = CEIL_ISTORE + NAMES_FREQS[29].1 as i16;
-
-// const SCRATCHPAD_L1: u32 = RANDOMX_SCRATCHPAD_L1 as u32 / 8;
-// const SCRATCHPAD_L2: u32 = RANDOMX_SCRATCHPAD_L2 as u32 / 8;
-// const SCRATCHPAD_L3: u32 = RANDOMX_SCRATCHPAD_L3 as u32 / 8;
-// const SCRATCHPAD_L1_MASK: u32 = (SCRATCHPAD_L1 - 1) * 8;
-// const SCRATCHPAD_L2_MASK: u32 = (SCRATCHPAD_L2 - 1) * 8;
-// const SCRATCHPAD_L3_MASK: u32 = (SCRATCHPAD_L3 - 1) * 8;
-// pub const SCRATCHPAD_L3_MASK64: i32 = ((SCRATCHPAD_L3 / 8 - 1) * 64) as i32;
-// const STORE_L3_CONDITION: i32 = 14;
-// const CONDITION_OFFSET: i32 = RANDOMX_JUMP_OFFSET;
-// const CONDITION_MASK:u32  = (1 << RANDOMX_JUMP_BITS) - 1;
 
 static ZERO: u64 = 0;
 
@@ -173,578 +162,7 @@ fn bc_noop() -> InstructionByteCode {
     }
 }
 
-fn bc(
-    instr_type: InstructionType,
-    idst: *mut u64,
-    isrc: *const u64,
-    fdst: *mut NativeFpuRegister,
-    fsrc: *const NativeFpuRegister,
-    imm: u64,
-    target: i16,
-    shift: u16,
-    mem_mask: u32,
-) -> InstructionByteCode {
-    InstructionByteCode {
-        idst,
-        isrc,
-        fdst,
-        fsrc,
-        imm,
-        target,
-        shift,
-        mem_mask,
-        instr_type,
-    }
-}
-// rename
-fn bc_imm_replaces_isrc(
-    instr_type: InstructionType,
-    idst: *mut u64,
-    fdst: *mut NativeFpuRegister,
-    fsrc: *const NativeFpuRegister,
-    imm: u64,
-    target: i16,
-    shift: u16,
-    mem_mask: u32,
-) -> InstructionByteCode {
-    let mut bc = InstructionByteCode {
-        idst,
-        isrc: null(),
-        fdst,
-        fsrc,
-        imm,
-        target,
-        shift,
-        mem_mask,
-        instr_type,
-    };
-    bc.isrc = &bc.imm;
-    bc
-}
-
 impl InstructionByteCode {
-    // pub fn from_instruction(
-    //     instr: &Instruction,
-    //     pc: i32,
-    //     nreg: &mut NativeRegisterFile,
-    //     register_usage: &mut RegistersCount,
-    // ) -> Self {
-    //     let opcode = instr.opcode as i16;
-    //     println!("pc {} opcode: {}", pc, opcode);
-
-    //     let mut instr_type = InstructionType::Nop;
-    //     let mut imm: u64 = 0;
-    //     let mut target: i16 = 0;
-    //     let mut shift: u16 = 0;
-    //     let mut mem_mask: u32 = 0;
-
-    //     let mut idst: *mut u64 = std::ptr::null_mut();
-    //     let mut isrc: *const u64 = std::ptr::null();
-    //     let mut fdst: *mut NativeFpuRegister = std::ptr::null_mut();
-    //     let mut fsrc: *const NativeFpuRegister = std::ptr::null();
-
-    //     if opcode < CEIL_IADD_RS {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IAddRs;
-    //         idst = &mut nreg.r[dst];
-    //         if dst != REGISTER_NEEDS_DISPLACEMENT {
-    //             isrc = &nreg.r[src];
-    //             shift = instr.get_mod_shift().into();
-    //             imm = 0;
-    //         } else {
-    //             isrc = &nreg.r[src];
-    //             shift = instr.get_mod_shift().into();
-    //             imm = sign_extend2s_compl(instr.get_imm32());
-    //         }
-    //         // println!("CEIL_IADD_RS dst: {}, src: {} imm64 {} ", dst, src, imm);
-
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IADD_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IAddM;
-    //         idst = &mut nreg.r[dst];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             mem_mask = if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             };
-    //         } else {
-    //             isrc = &ZERO;
-    //             mem_mask = SCRATCHPAD_L3_MASK;
-    //         }
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_ISUB_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::ISubR;
-    //         idst = &mut nreg.r[dst];
-    //         register_usage[dst] = pc;
-
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             return bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         } else {
-    //             imm = sign_extend2s_compl(instr.get_imm32());
-    //             // isrc = &imm;
-    //             return bc_imm_replaces_isrc(
-    //                 instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         }
-    //     }
-
-    //     if opcode < CEIL_IMUL_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         println!("IMUL_R");
-    //         instr_type = InstructionType::IMulR;
-    //         register_usage[dst] = pc;
-
-    //         idst = &mut nreg.r[dst];
-    //         return if src != dst {
-    //             isrc = &nreg.r[src];
-    //             bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             )
-    //         } else {
-    //             imm = sign_extend2s_compl(instr.get_imm32());
-    //             println!("IMUL_R imm: {}", imm);
-    //             bc_imm_replaces_isrc(instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask)
-    //         };
-    //     }
-
-    //     if opcode < CEIL_IMUL_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IMulM;
-    //         idst = &mut nreg.r[dst];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             mem_mask = if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             };
-    //         } else {
-    //             isrc = &ZERO;
-    //             mem_mask = SCRATCHPAD_L3_MASK;
-    //         }
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IMULH_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IMulhR;
-    //         idst = &mut nreg.r[dst];
-    //         isrc = &nreg.r[src];
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IMULH_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IMulhM;
-    //         idst = &mut nreg.r[dst];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             mem_mask = if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             };
-    //         } else {
-    //             isrc = &ZERO;
-    //             mem_mask = SCRATCHPAD_L3_MASK;
-    //         }
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_ISMULH_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::ISMulhR;
-    //         idst = &mut nreg.r[dst];
-    //         isrc = &nreg.r[src];
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_ISMULH_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::ISMulhM;
-    //         idst = &mut nreg.r[dst];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             mem_mask = if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             };
-    //         } else {
-    //             isrc = &ZERO;
-    //             mem_mask = SCRATCHPAD_L3_MASK;
-    //         }
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IMUL_RCP {
-    //         println!("IMUL_RCP");
-    //         let divisor = instr.get_imm32() as u32;
-    //         if !(divisor.is_power_of_two() || divisor == 0) {
-    //             let dst = instr.dst as usize % REGISTER_COUNT;
-    //             instr_type = InstructionType::IMulR;
-    //             idst = &mut nreg.r[dst];
-    //             // imm = randomx_reciprocal(divisor);
-    //             imm = randomx_reciprocal(divisor);
-    //             // isrc = &imm;
-    //             register_usage[dst] = pc;
-    //             let bc = bc_imm_replaces_isrc(
-    //                 instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //             unsafe {
-    //                 println!(
-    //                     "IMUL_RCP dst {} imm: {} bc.isrc {} *bc.isrc {}",
-    //                     dst, imm, bc.isrc as u64, *bc.isrc
-    //                 );
-    //             }
-    //             return bc;
-    //         } else {
-    //             instr_type = InstructionType::Nop;
-    //             return bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         }
-    //         // return bc(
-    //         //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         // );
-    //     }
-
-    //     if opcode < CEIL_INEG_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::INegR;
-    //         idst = &mut nreg.r[dst];
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IXOR_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IXorR;
-    //         idst = &mut nreg.r[dst];
-    //         register_usage[dst] = pc;
-
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             return bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         } else {
-    //             imm = sign_extend2s_compl(instr.get_imm32());
-    //             // isrc = &imm;
-    //             return bc_imm_replaces_isrc(
-    //                 instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         }
-    //     }
-
-    //     if opcode < CEIL_IXOR_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IXorM;
-    //         idst = &mut nreg.r[dst];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             mem_mask = if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             };
-    //         } else {
-    //             isrc = &ZERO;
-    //             mem_mask = SCRATCHPAD_L3_MASK;
-    //         }
-    //         register_usage[dst] = pc;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_IROR_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IRorR;
-    //         idst = &mut nreg.r[dst];
-    //         register_usage[dst] = pc;
-
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             return bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         } else {
-    //             imm = instr.get_imm32() as u64;
-    //             // isrc = &imm;
-    //             return bc_imm_replaces_isrc(
-    //                 instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         }
-    //     }
-
-    //     if opcode < CEIL_IROL_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IRolR;
-    //         idst = &mut nreg.r[dst];
-    //         register_usage[dst] = pc;
-
-    //         if src != dst {
-    //             isrc = &nreg.r[src];
-    //             return bc(
-    //                 instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         } else {
-    //             imm = instr.get_imm32() as u64;
-    //             // isrc = &imm;
-    //             return bc_imm_replaces_isrc(
-    //                 instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-    //             );
-    //         }
-    //     }
-
-    //     if opcode < CEIL_ISWAP_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         if src != dst {
-    //             idst = &mut nreg.r[dst];
-    //             isrc = &nreg.r[src];
-    //             instr_type = InstructionType::ISwapR;
-    //             register_usage[dst] = pc;
-    //             register_usage[src] = pc;
-    //         } else {
-    //             instr_type = InstructionType::Nop;
-    //         }
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     //////////////
-
-    //     if opcode < CEIL_FSWAP_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::FSwapR;
-    //         if dst < REGISTER_COUNT_FLT as usize {
-    //             fdst = &mut nreg.f[dst];
-    //         } else {
-    //             fdst = &mut nreg.e[dst - REGISTER_COUNT_FLT as usize];
-    //         }
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FADD_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT_FLT;
-    //         instr_type = InstructionType::FAddR;
-    //         fdst = &mut nreg.f[dst];
-    //         fsrc = &nreg.a[src];
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FADD_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::FAddM;
-    //         fdst = &mut nreg.f[dst];
-    //         isrc = &nreg.r[src];
-    //         mem_mask = if instr.get_mod_mem() != 0 {
-    //             SCRATCHPAD_L1_MASK
-    //         } else {
-    //             SCRATCHPAD_L2_MASK
-    //         };
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FSUB_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT_FLT;
-    //         instr_type = InstructionType::FSubR;
-    //         fdst = &mut nreg.f[dst];
-    //         fsrc = &nreg.a[src];
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FSUB_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::FSubM;
-    //         fdst = &mut nreg.f[dst];
-    //         isrc = &nreg.r[src];
-    //         mem_mask = if instr.get_mod_mem() != 0 {
-    //             SCRATCHPAD_L1_MASK
-    //         } else {
-    //             SCRATCHPAD_L2_MASK
-    //         };
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FSCAL_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         instr_type = InstructionType::FScalR;
-    //         fdst = &mut nreg.f[dst];
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FMUL_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT_FLT;
-    //         instr_type = InstructionType::FMulR;
-    //         fdst = &mut nreg.e[dst];
-    //         fsrc = &nreg.a[src];
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FDIV_M {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::FDivM;
-    //         fdst = &mut nreg.e[dst];
-    //         isrc = &nreg.r[src];
-    //         mem_mask = if instr.get_mod_mem() != 0 {
-    //             SCRATCHPAD_L1_MASK
-    //         } else {
-    //             SCRATCHPAD_L2_MASK
-    //         };
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_FSQRT_R {
-    //         let dst = instr.dst as usize % REGISTER_COUNT_FLT;
-    //         instr_type = InstructionType::FSqrtR;
-    //         fdst = &mut nreg.e[dst];
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_CBRANCH {
-    //         instr_type = InstructionType::CBranch;
-    //         let creg = instr.dst as usize % REGISTER_COUNT;
-    //         idst = &mut nreg.r[creg];
-    //         target = register_usage[creg] as i16;
-    //         let cond_shift = instr.get_mod_cond() + CONDITION_OFFSET;
-    //         imm = sign_extend2s_compl(instr.get_imm32() | (1 << cond_shift));
-    //         if CONDITION_OFFSET > 0 || cond_shift > 0 {
-    //             imm &= !(1u64 << (cond_shift - 1));
-    //         }
-    //         mem_mask = CONDITION_MASK << cond_shift;
-    //         // mark all registers as used
-    //         for j in 0..REGISTER_COUNT {
-    //             register_usage[j] = pc;
-    //         }
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_CFROUND {
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         isrc = &nreg.r[src];
-    //         instr_type = InstructionType::CFround;
-    //         imm = (instr.get_imm32() & 63) as u64;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_ISTORE {
-    //         let dst = instr.dst as usize % REGISTER_COUNT;
-    //         let src = instr.src as usize % REGISTER_COUNT;
-    //         instr_type = InstructionType::IStore;
-    //         idst = &mut nreg.r[dst];
-    //         isrc = &nreg.r[src];
-    //         imm = sign_extend2s_compl(instr.get_imm32());
-    //         mem_mask = if instr.get_mod_cond() < STORE_L3_CONDITION {
-    //             if instr.get_mod_mem() != 0 {
-    //                 SCRATCHPAD_L1_MASK
-    //             } else {
-    //                 SCRATCHPAD_L2_MASK
-    //             }
-    //         } else {
-    //             SCRATCHPAD_L3_MASK
-    //         };
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     if opcode < CEIL_NOP {
-    //         instr_type = InstructionType::Nop;
-    //         return bc(
-    //             instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-    //         );
-    //     }
-
-    //     unreachable!("UNREACHABLE");
-    // }
-
     pub fn modify_with_instruction(
         &mut self,
         instr: &Instruction,
@@ -753,18 +171,6 @@ impl InstructionByteCode {
         register_usage: &mut RegistersCount,
     ) {
         let opcode = instr.opcode as i16;
-        // println!("pc {} opcode: {}", pc, opcode);
-
-        // let mut instr_type = InstructionType::Nop;
-        // let mut imm: u64 = 0;
-        // let mut target: i16 = 0;
-        // let mut shift: u16 = 0;
-        // let mut mem_mask: u32 = 0;
-
-        // let mut idst: *mut u64 = std::ptr::null_mut();
-        // let mut isrc: *const u64 = std::ptr::null();
-        // let mut fdst: *mut NativeFpuRegister = std::ptr::null_mut();
-        // let mut fsrc: *const NativeFpuRegister = std::ptr::null();
 
         if opcode < CEIL_IADD_RS {
             let dst = instr.dst as usize % REGISTER_COUNT;
@@ -780,12 +186,9 @@ impl InstructionByteCode {
                 self.shift = instr.get_mod_shift().into();
                 self.imm = sign_extend2s_compl(instr.get_imm32());
             }
-            // println!("CEIL_IADD_RS dst: {}, src: {} imm64 {} ", dst, src, imm);
 
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IADD_M {
@@ -807,9 +210,6 @@ impl InstructionByteCode {
             }
             register_usage[dst] = pc;
             return;
-            // return bc(
-            //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-            // );
         }
 
         if opcode < CEIL_ISUB_R {
@@ -820,19 +220,13 @@ impl InstructionByteCode {
             register_usage[dst] = pc;
             if src != dst {
                 self.isrc = &nreg.r[src];
-                // println!("PC {} ISUB_R 1 src {} dst {} ", pc, src, dst);
 
-                return; // return bc(
-                        //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             } else {
                 self.imm = sign_extend2s_compl(instr.get_imm32());
-                // println!("PC {} ISUB_R 1 src {} dst {} imm {}", pc, src, dst, self.imm);
 
                 self.isrc = &self.imm;
-                return; // return bc_imm_replaces_isrc(
-                        //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             }
         }
 
@@ -851,36 +245,26 @@ impl InstructionByteCode {
                 } else {
                     SCRATCHPAD_L2_MASK
                 };
-                return; // return bc(
-                        //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             } else {
                 self.isrc = &ZERO;
                 self.mem_mask = SCRATCHPAD_L3_MASK;
-                return; // return bc_imm_replaces_isrc(
-                        //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             }
         }
 
         if opcode < CEIL_IMUL_R {
             let dst = instr.dst as usize % REGISTER_COUNT;
             let src = instr.src as usize % REGISTER_COUNT;
-            // println!("IMUL_R");
             self.instr_type = InstructionType::IMulR;
             register_usage[dst] = pc;
 
             self.idst = &mut nreg.r[dst];
             return if src != dst {
                 self.isrc = &nreg.r[src];
-                // bc(
-                //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                // )
             } else {
                 self.imm = sign_extend2s_compl(instr.get_imm32());
                 self.isrc = &self.imm;
-                // println!("IMUL_R imm: {}", self.imm);
-                // bc_imm_replaces_isrc(instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask)
             };
         }
 
@@ -902,9 +286,7 @@ impl InstructionByteCode {
                 self.mem_mask = SCRATCHPAD_L3_MASK;
             }
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IMULH_R {
@@ -914,9 +296,7 @@ impl InstructionByteCode {
             self.idst = &mut nreg.r[dst];
             self.isrc = &nreg.r[src];
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IMULH_M {
@@ -937,9 +317,7 @@ impl InstructionByteCode {
                 self.mem_mask = SCRATCHPAD_L3_MASK;
             }
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_ISMULH_R {
@@ -949,9 +327,7 @@ impl InstructionByteCode {
             self.idst = &mut nreg.r[dst];
             self.isrc = &nreg.r[src];
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_ISMULH_M {
@@ -972,13 +348,10 @@ impl InstructionByteCode {
                 self.mem_mask = SCRATCHPAD_L3_MASK;
             }
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IMUL_RCP {
-            // println!("IMUL_RCP");
             let divisor = instr.get_imm32() as u32;
             if !(divisor.is_power_of_two() || divisor == 0) {
                 let dst = instr.dst as usize % REGISTER_COUNT;
@@ -987,25 +360,10 @@ impl InstructionByteCode {
                 self.imm = randomx_reciprocal(divisor);
                 self.isrc = &self.imm;
                 register_usage[dst] = pc;
-                // let bc = bc_imm_replaces_isrc(
-                //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                // );
-                // unsafe {
-                //     println!(
-                //         "IMUL_RCP dst {} imm: {} bc.isrc {} *bc.isrc {}",
-                //         dst, self.imm, self.isrc as u64, *self.isrc
-                //     );
-                // }
-                // return bc;
             } else {
                 self.instr_type = InstructionType::Nop;
-                return; // return bc(
-                        //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
             }
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_INEG_R {
@@ -1013,9 +371,7 @@ impl InstructionByteCode {
             self.instr_type = InstructionType::INegR;
             self.idst = &mut nreg.r[dst];
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IXOR_R {
@@ -1027,15 +383,11 @@ impl InstructionByteCode {
 
             if src != dst {
                 self.isrc = &nreg.r[src];
-                return; // return bc(
-                        //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             } else {
                 self.imm = sign_extend2s_compl(instr.get_imm32());
                 self.isrc = &self.imm;
-                return; // return bc_imm_replaces_isrc(
-                        //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return;
             }
         }
 
@@ -1057,9 +409,7 @@ impl InstructionByteCode {
                 self.mem_mask = SCRATCHPAD_L3_MASK;
             }
             register_usage[dst] = pc;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_IROR_R {
@@ -1071,15 +421,11 @@ impl InstructionByteCode {
 
             if src != dst {
                 self.isrc = &nreg.r[src];
-                return; // return bc(
-                        // instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return; 
             } else {
                 self.imm = instr.get_imm32() as u64;
                 self.isrc = &self.imm;
-                return; // return bc_imm_replaces_isrc(
-                        //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return; 
             }
         }
 
@@ -1092,15 +438,11 @@ impl InstructionByteCode {
 
             if src != dst {
                 self.isrc = &nreg.r[src];
-                return; // return bc(
-                        // instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return; 
             } else {
                 self.imm = instr.get_imm32() as u64;
                 self.isrc = &self.imm;
-                return; // return bc_imm_replaces_isrc(
-                        //     instr_type, idst, fdst, fsrc, imm, target, shift, mem_mask,
-                        // );
+                return; 
             }
         }
 
@@ -1116,9 +458,7 @@ impl InstructionByteCode {
             } else {
                 self.instr_type = InstructionType::Nop;
             }
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         //////////////
@@ -1131,9 +471,7 @@ impl InstructionByteCode {
             } else {
                 self.fdst = &mut nreg.e[dst - REGISTER_COUNT_FLT as usize];
             }
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return;
         }
 
         if opcode < CEIL_FADD_R {
@@ -1142,9 +480,7 @@ impl InstructionByteCode {
             self.instr_type = InstructionType::FAddR;
             self.fdst = &mut nreg.f[dst];
             self.fsrc = &nreg.a[src];
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FADD_M {
@@ -1159,9 +495,7 @@ impl InstructionByteCode {
                 SCRATCHPAD_L2_MASK
             };
             self.imm = sign_extend2s_compl(instr.get_imm32());
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FSUB_R {
@@ -1170,9 +504,7 @@ impl InstructionByteCode {
             self.instr_type = InstructionType::FSubR;
             self.fdst = &mut nreg.f[dst];
             self.fsrc = &nreg.a[src];
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FSUB_M {
@@ -1187,18 +519,14 @@ impl InstructionByteCode {
                 SCRATCHPAD_L2_MASK
             };
             self.imm = sign_extend2s_compl(instr.get_imm32());
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FSCAL_R {
             let dst = instr.dst as usize % REGISTER_COUNT_FLT;
             self.instr_type = InstructionType::FScalR;
             self.fdst = &mut nreg.f[dst];
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FMUL_R {
@@ -1207,9 +535,7 @@ impl InstructionByteCode {
             self.instr_type = InstructionType::FMulR;
             self.fdst = &mut nreg.e[dst];
             self.fsrc = &nreg.a[src];
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FDIV_M {
@@ -1224,18 +550,14 @@ impl InstructionByteCode {
                 SCRATCHPAD_L2_MASK
             };
             self.imm = sign_extend2s_compl(instr.get_imm32());
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_FSQRT_R {
             let dst = instr.dst as usize % REGISTER_COUNT_FLT;
             self.instr_type = InstructionType::FSqrtR;
             self.fdst = &mut nreg.e[dst];
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_CBRANCH {
@@ -1243,7 +565,6 @@ impl InstructionByteCode {
             let creg = instr.dst as usize % REGISTER_COUNT;
             self.idst = &mut nreg.r[creg];
             self.target = register_usage[creg] as i16;
-            // println!("compile CBRANCH i {} {} {:?}", pc, creg, register_usage);
             let cond_shift = instr.get_mod_cond() + CONDITION_OFFSET;
             self.imm = sign_extend2s_compl(instr.get_imm32() | (1 << cond_shift));
             if CONDITION_OFFSET > 0 || cond_shift > 0 {
@@ -1254,9 +575,7 @@ impl InstructionByteCode {
             for j in 0..REGISTER_COUNT {
                 register_usage[j] = pc;
             }
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_CFROUND {
@@ -1264,9 +583,7 @@ impl InstructionByteCode {
             self.isrc = &nreg.r[src];
             self.instr_type = InstructionType::CFround;
             self.imm = (instr.get_imm32() & 63) as u64;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_ISTORE {
@@ -1285,16 +602,12 @@ impl InstructionByteCode {
             } else {
                 SCRATCHPAD_L3_MASK
             };
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         if opcode < CEIL_NOP {
             self.instr_type = InstructionType::Nop;
-            return; // return bc(
-                    //     instr_type, idst, isrc, fdst, fsrc, imm, target, shift, mem_mask,
-                    // );
+            return; 
         }
 
         unreachable!("UNREACHABLE");
@@ -1320,31 +633,22 @@ impl InstructionByteCode {
 
     fn execute(&self, pc: i16, scratchpad: &[u8], config_entropy: &[u64; 2]) -> i16 {
         let mut new_pc = pc;
-        // println!("instr_type: {:?}", self.instr_type);
-        // println!("execute bc {:?}", self);
         unsafe {
             match self.instr_type {
                 InstructionType::IAddRs => {
-                    let a = (*self.isrc << self.shift).wrapping_add(self.imm);
-                    // println!("IAddRs idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
-                    *self.idst = (*self.idst).wrapping_add(a)
+                    let shifted_src = (*self.isrc << self.shift).wrapping_add(self.imm);
+                    *self.idst = (*self.idst).wrapping_add(shifted_src)
                 }
                 InstructionType::IAddM => {
                     *self.idst = (*self.idst).wrapping_add(self.get_u64_from_scratchpad(scratchpad))
                 }
                 InstructionType::ISubR => {
-                    let a = (*self.idst).wrapping_sub(*self.isrc);
-                    // println!("ISubR idst: {}, isrc: {} {}", *self.idst, *self.isrc, a);
                     *self.idst = (*self.idst).wrapping_sub(*self.isrc);
                 }
                 InstructionType::ISubM => {
                     *self.idst = (*self.idst).wrapping_sub(self.get_u64_from_scratchpad(scratchpad))
                 }
                 InstructionType::IMulR | InstructionType::IMulRcp => {
-                    // println!(
-                        // "*idst: {}, *isrc: {} isrc {}, imm {}",
-                        // *self.idst, *self.isrc, self.isrc as u64, self.imm
-                    // );
                     *self.idst = (*self.idst).wrapping_mul(*self.isrc)
                 }
                 InstructionType::IMulM => {
@@ -1356,7 +660,7 @@ impl InstructionByteCode {
                 }
                 InstructionType::ISMulhR => {
                     *self.idst = smulh(*self.idst as i64, *self.isrc as i64) as u64
-                } // WIP double check
+                }
                 InstructionType::ISMulhM => {
                     *self.idst = smulh(
                         *self.idst as i64,
@@ -1387,9 +691,7 @@ impl InstructionByteCode {
                 }
                 InstructionType::FSwapR => *self.fdst = rx_swap_vec_f128(*self.fdst),
                 InstructionType::FAddR => {
-                    let a = *self.fdst;
                     *self.fdst = rx_add_vec_f128(*self.fdst, *self.fsrc);
-                    // println!("FAddR orig fdst {:?} fsrc: {:?} fdst: {:?},  ", a, *self.fsrc, *self.fdst);
                 }
                 InstructionType::FAddM => {
                     let fsrc = rx_cvt_packed_int_vec_f128(self.get_scratchpad_address(scratchpad));
@@ -1414,10 +716,8 @@ impl InstructionByteCode {
                 }
                 InstructionType::FSqrtR => *self.fdst = rx_sqrt_vec_f128(*self.fdst),
                 InstructionType::CBranch => {
-                    // println!("CBranch idst: {}, imm {} mem_mask {}", *self.idst, self.imm, self.mem_mask);
                     *self.idst = (*self.idst).wrapping_add(self.imm);
                     if (*self.idst & self.mem_mask as u64) == 0 {
-                        // println!("CBranch target {}", self.target);
                         new_pc = self.target;
                     }
                 }
@@ -1441,68 +741,23 @@ impl InstructionByteCode {
 }
 
 pub(crate) struct BytecodeMachine<'bytecode> {
-    // pub bytecode: Vec<InstructionByteCode>,
     pub bytecode: &'bytecode mut BytecodeStorage,
-    register_usage: RegistersCount,
 }
 
 impl<'bytecode> BytecodeMachine<'bytecode> {
-    // pub(crate) fn empty() -> Self {
-    //     let bytecode = Vec::new();
-    //     let register_usage = [0; REGISTER_COUNT];
-    //     Self {
-    //         bytecode,
-    //         register_usage,
-    //     }
-    // }
-
-    // pub(crate) fn from_instructions_and_nreg<'instr>(
-    //     instructions: Iter<'instr, Instruction>,
-    //     nreg: &mut NativeRegisterFile,
-    // ) -> Self {
-    //     let mut register_usage = [-1i32; REGISTER_COUNT];
-
-    //     let bytecode = instructions
-    //         .enumerate()
-    //         .map(|(pc, instr)| {
-    //             // Guaranteed that pc fits into u8
-    //             let pc = pc as i32;
-    //             InstructionByteCode::from_instruction(instr, pc, nreg, &mut register_usage)
-    //         })
-    //         .collect();
-
-    //     Self {
-    //         bytecode,
-    //         register_usage,
-    //     }
-    // }
-
     pub(crate) fn from_components<'instr>(
         instructions: &'instr InstructionsStorage,
         nreg: &mut NativeRegisterFile,
         bytecode: &'bytecode mut BytecodeStorage,
     ) -> Self {
         let mut register_usage = [-1i32; REGISTER_COUNT];
-        // let bytecode_int = vec![];
 
         for pc in 0..RANDOMX_PROGRAM_SIZE {
             let instr = &instructions[pc];
             bytecode[pc].modify_with_instruction(instr, pc as i32, nreg, &mut register_usage);
-            // InstructionByteCode::from_instruction(instr, pc as i32, nreg, &mut register_usage);
         }
-        // let bytecode = instructions
-        //     .enumerate()
-        //     .map(|(pc, instr)| {
-        //         // Guaranteed that pc fits into u8
-        //         let pc = pc as i32;
-        //         InstructionByteCode::from_instruction(instr, pc, nreg, &mut register_usage)
-        //     })
-        //     .collect();
 
-        Self {
-            bytecode,
-            register_usage,
-        }
+        Self { bytecode }
     }
 
     pub(crate) fn execute_bytecode(
@@ -1513,24 +768,16 @@ impl<'bytecode> BytecodeMachine<'bytecode> {
         _ic: usize,
     ) {
         let mut pc = 0;
-        // let mut original_pc = 0; // WIP
         let bytecode_len = self.bytecode.len() as i16;
         while 0 <= pc && pc < bytecode_len {
             let ibc = &self.bytecode[pc as usize];
             pc = ibc.execute(pc, scratchpad, config_entropy);
-            // if _ic == 197 {
-            //     println!(
-            //         "execute PC {:} after bc exec nreg.r[0]:  {:?} {:?}",
-            //         pc, _nreg.r[0], ibc,
-            //     );
-            // }
-            
-            // original_pc = pc;
             pc += 1;
         }
     }
 }
 
+#[allow(dead_code)]
 mod tests {
     use super::*;
 
@@ -1540,20 +787,42 @@ mod tests {
         (nreg, register_usage)
     }
 
-    // #[test]
-    // fn test_empty_bytecode_machine() {
-    //     let machine = BytecodeMachine::empty();
-    //     assert!(machine.bytecode.is_empty());
-    // }
+    #[test]
+    fn test_modify_iadd_rs() {
+        let opcode = CEIL_IADD_RS - 1; // попадаем в первую ветку: if opcode < CEIL_IADD_RS
+        let instr = Instruction::new(opcode as u8, 1, 2, 123, 3);
+        let mut bc = InstructionByteCode::default();
 
-    // #[test]
-    // fn test_iadd_rs() {
-    //     let (mut nreg, mut usage) = setup();
-    //     // guaranted to fit into u8
-    //     let opcode = (CEIL_IADD_RS - 1) as u8;
-    //     let instr = Instruction::new(opcode, 2, 3, 0, 1);
-    //     let pc = 10;
-    //     let result = InstructionByteCode::from_instruction(&instr, pc, &mut nreg, &mut usage);
-    //     assert_eq!(result.instr_type, InstructionType::IAddRs);
-    // }
+        let (mut nreg, mut register_usage) = setup();
+        let pc = 10;
+
+        bc.modify_with_instruction(&instr, pc, &mut nreg, &mut register_usage);
+
+        assert_eq!(bc.instr_type, InstructionType::IAddRs);
+        assert_eq!(bc.idst, &mut nreg.r[1] as *mut u64);
+        assert_eq!(bc.isrc, &nreg.r[2] as *const u64);
+        assert_eq!(bc.shift, instr.get_mod_shift() as u16 );
+        assert_eq!(bc.imm, 0);
+        assert_eq!(register_usage[1], pc);
+    }
+
+    #[test]
+    fn test_modify_iadd_rs_w_displacement_dst() {
+        let opcode = CEIL_IADD_RS - 1; // попадаем в первую ветку: if opcode < CEIL_IADD_RS
+        let dst_reg_id = 5;
+        let instr = Instruction::new(opcode as u8, dst_reg_id, 2, 123, 3);
+        let mut bc = InstructionByteCode::default();
+
+        let (mut nreg, mut register_usage) = setup();
+        let pc = 10;
+
+        bc.modify_with_instruction(&instr, pc, &mut nreg, &mut register_usage);
+
+        assert_eq!(bc.instr_type, InstructionType::IAddRs);
+        assert_eq!(bc.idst, &mut nreg.r[dst_reg_id as usize] as *mut u64);
+        assert_eq!(bc.isrc, &nreg.r[2] as *const u64);
+        assert_eq!(bc.shift, instr.get_mod_shift() as u16 );
+        assert_eq!(bc.imm, sign_extend2s_compl(instr.get_imm32()));
+        assert_eq!(register_usage[dst_reg_id as usize], pc);
+    }
 }

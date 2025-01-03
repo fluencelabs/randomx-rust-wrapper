@@ -14,25 +14,23 @@
  * limitations under the License.
  */
 
-use core::hash;
-use std::{fs::File, io::Write, os::raw::c_void, ptr};
+use std::{os::raw::c_void, ptr};
 
 use crate::{
     bindings::{
         cache::randomx_cache,
         dataset::randomx_init_dataset_item,
-        entropy::{randomx_blake2b, randomx_fill_aes_1rx4, randomx_hash_aes_1rx4},
-        float_rounding::randomx_reset_rounding_mode,
+        entropy::{randomx_blake2b, randomx_fill_aes_1rx4},
+        hashing::randomx_hash_aes_1rx4,
     },
-    bytecode_machine::{self, BytecodeMachine, BytecodeStorage, InstructionByteCode},
+    bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode},
     constants::{CACHE_LINE_ALIGN_MASK, RANDOMX_SCRATCHPAD_L3, SCRATCHPAD_L3_MASK64},
     intrinsics::{
-        mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_store_vec_f128,
-        rx_xor_vec_f128, NativeFpuRegister,
+        get_csr, mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_reset_float_state, rx_store_vec_f128, rx_xor_vec_f128, set_csr
     },
     program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE},
     registers::{
-        self, FpuRegister, IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT,
+        IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT,
         REGISTER_COUNT_FLT,
     },
     result_hash::ToRawMut,
@@ -114,8 +112,6 @@ pub struct IronLightVM<T> {
     mem: MemoryRegisters,
     config: ProgramConfiguration,
     scratchpad: Vec<u8>, // replace with Box<[u8]> || aligned_alloc prims
-    cache_key: String,
-    temp_hash: [u64; 8],
     randomx_cache: T,
     dataset_offset: usize,
     bytecode: BytecodeStorage,
@@ -126,16 +122,13 @@ where
     T: CacheRawAPI,
 {
     pub fn new(randomx_cache: T, flags: RandomXFlags) -> RResult<Self> {
-        if !flags.is_light_mode() {
-            // WIP
-            return Err(VmCreationError::IncorrectLightModeFlag { flags })?;
+        if !flags.is_ironlight_mode() {
+            return Err(VmCreationError::IncorrectIronLightModeFlag { flags })?;
         }
 
         let config = ProgramConfiguration::default();
         let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
         let reg = RegisterFile::default();
-        let temp_hash = [0; 8];
-        let cache_key = String::new();
         let mem = MemoryRegisters::default();
         let dataset_offset = 0;
         let bytecode = [InstructionByteCode::default(); RANDOMX_PROGRAM_SIZE];
@@ -145,8 +138,6 @@ where
             config,
             scratchpad,
             reg,
-            temp_hash,
-            cache_key,
             randomx_cache,
             dataset_offset,
             bytecode,
@@ -156,11 +147,9 @@ where
     }
 
     /// Calculates a RandomX hash value.
-    /// mut is strange. need to decided whether to preserve an existing VM API or not
     pub fn hash(&mut self, local_nonce: &[u8]) -> ResultHash {
         // Watch out USE_CSR_INTRINSICS macro in randomx.cpp
-
-        // let mut hash = ResultHash::empty();
+        let fpstate = get_csr();
 
         let mut temp_hash = Aligned16([0u64; 8]);
         let temp_hash_ptr = temp_hash.0.as_mut_ptr() as *mut std::ffi::c_void;
@@ -176,18 +165,14 @@ where
             );
         }
 
-        let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
+        // let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
 
-        println!("Result hash: {}", hex_string);
-        println! {""};
+        // println!("Result hash: {}", hex_string);
+        // println! {""};
         self.init_scratchpad(&mut temp_hash);
-        unsafe {
-            randomx_reset_rounding_mode();
-        }
+        rx_reset_float_state();
 
         for _ in 0..RANDOMX_PROGRAM_COUNT-1 {
-        // for _ in 0..1 {
-            // WIP run doesn't need mut temp_hash TBH. Replace temp_hash with hash mb.
             self.run(&mut temp_hash);
             let reg_ptr = &self.reg as *const RegisterFile as *const std::ffi::c_void;
             unsafe {
@@ -199,24 +184,13 @@ where
                     ptr::null(),
                     0usize,
                 );
-                // assert(result == 0);
+                assert!(result == 0);
             }
         }
 
-        // let mut f = File::create("./scratchpad").unwrap();
-        // f.write(&self.scratchpad).unwrap();
-
-        // for (int chain = 0; chain < RANDOMX_PROGRAM_COUNT - 1; ++chain) {
-        // 	machine->run(&tempHash);
-        // 	blakeResult = blake2b(tempHash, sizeof(tempHash), machine->getRegisterFile(), sizeof(randomx::RegisterFile), nullptr, 0);
-        // 	assert(blakeResult == 0);
-        // }
-
-        // machine->run(&tempHash);
-        // machine->getFinalResult(output, RANDOMX_HASH_SIZE);
-
-        // WIP run_final doesn't need mut temp_hash TBH. Replace temp_hash with hash mb.
-        self.run_final(&mut temp_hash).get_final_result()
+        let result = self.run_final(&mut temp_hash).get_final_result();
+        set_csr(fpstate);
+        result
     }
 
     // test
@@ -225,9 +199,7 @@ where
             .into_iter()
             .map(|i| f64::from_bits(get_small_positive_float_bits(program.get_entropy(i))))
             .collect::<Vec<f64>>();
-        // println!("fpu_entropy: {:?}", fpu_entropy);
         self.reg.initialise_fpu_a(&fpu_entropy);
-        // println!("reg.a: {:?}", self.reg.a);
 
         let mem_ma_entropy = program.get_entropy(8);
         let mem_mx = program.get_entropy(10);
@@ -255,13 +227,8 @@ where
             &mut self.bytecode,
         );
 
-        // WIP types
         let mut sp_addr0 = self.mem.mx as u64;
         let mut sp_addr1 = self.mem.ma as u64;
-
-        // println!("execute in reg.r[0]: {:?}", nreg.r[0]);
-
-        // let a = bytecode_machine.bytecode[19];
         // unsafe {
         //     println!("bytecode_machine.bytecode[19]: {:?} *isrc {}", a, *bytecode_machine.bytecode[19].isrc);
         // }
@@ -322,13 +289,10 @@ where
             self.mem.mx ^= (nreg.r[self.config.read_reg2 as usize]
                 ^ nreg.r[self.config.read_reg3 as usize]) as u32;
             self.mem.mx &= CACHE_LINE_ALIGN_MASK;
-            // prefetch
-            // read into nreg.r
-            // dataset_read
             let dataset_offset = self.dataset_offset + self.mem.ma as usize;
 
+            // TBD optionally dataset prefetch
             nreg.r = dataset_read(self.randomx_cache.raw(), dataset_offset, &nreg.r);
-            // println!("after dataset_read nreg.r[0]: {:?}", nreg.r[0]);
 
             std::mem::swap(&mut self.mem.mx, &mut self.mem.ma);
 
@@ -355,10 +319,6 @@ where
 
             sp_addr0 = 0;
             sp_addr1 = 0;
-            // println!("execute loop nreg.r[0]: {:?}", nreg.r[0]);
-            // if ic == 197 || ic == 196 {
-            //     println!("execute reg.r: {:?}", nreg.r);
-            // }
         }
 
         self.reg.r = nreg.r;
@@ -372,7 +332,6 @@ where
 
     fn generate_and_run(&mut self, seed: &mut Aligned16) {
         let program = Program::with_seed(seed);
-        // println!("{:}", program);
         self.initialize(&program);
         self.execute(&program);
     }
@@ -391,18 +350,6 @@ where
 
         unsafe {
             randomx_hash_aes_1rx4(scratchpad, RANDOMX_SCRATCHPAD_L3, aes_dst_ptr);
-            // println!("execute after bc exec self.reg.a[0]:  {:?}", self.reg.a[0]);
-            // println!("execute after bc exec self.reg.a[1]:  {:?}", self.reg.a[1]);
-            // println!("execute after bc exec self.reg.a[2]:  {:?}", self.reg.a[2]);
-            // println!("execute after bc exec self.reg.a[3]:  {:?}", self.reg.a[3]);
-            // println!("execute after bc exec self.reg.f[0]:  {:?}", self.reg.f[0]);
-            // println!("execute after bc exec self.reg.f[1]:  {:?}", self.reg.f[1]);
-            // println!("execute after bc exec self.reg.f[2]:  {:?}", self.reg.f[2]);
-            // println!("execute after bc exec self.reg.f[3]:  {:?}", self.reg.f[3]);
-            // println!("execute after bc exec self.reg.e[0]:  {:?}", self.reg.e[0]);
-            // println!("execute after bc exec self.reg.e[1]:  {:?}", self.reg.e[1]);
-            // println!("execute after bc exec self.reg.e[2]:  {:?}", self.reg.e[2]);
-            // println!("execute after bc exec self.reg.e[3]:  {:?}", self.reg.e[3]);
             let reg_ptr = &self.reg as *const RegisterFile as *const std::ffi::c_void;
             randomx_blake2b(
                 hash_ptr,

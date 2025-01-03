@@ -95,51 +95,16 @@ impl Instruction {
         self.imm32
     }
 
-    pub fn set_imm32(&mut self, val: u32) {
-        self.imm32 = val;
-    }
-
     pub fn get_mod_mem(&self) -> u8 {
         self.mod_ & 0b11
     }
 
-    // WIP double check the intermediate results
     pub fn get_mod_shift(&self) -> u8 {
         (self.mod_ >> 2) & 0b11
     }
 
     pub fn get_mod_cond(&self) -> i32 {
         (self.mod_ >> 4) as i32
-    }
-
-    pub fn set_mod(&mut self, val: u8) {
-        self.mod_ = val;
-    }
-
-    pub fn gen_address_reg(&self, src_index: u8) -> String {
-        format!(
-            "{}[r{}{:?}]",
-            if self.get_mod_mem() == 0 { "L2" } else { "L1" },
-            src_index,
-            self.get_imm32()
-        )
-    }
-
-    pub fn gen_address_reg_dst(&self, dst_index: u8) -> String {
-        let layer = if self.get_mod_cond() < 4 {
-            if self.get_mod_mem() == 0 {
-                "L2"
-            } else {
-                "L1"
-            }
-        } else {
-            "L3"
-        };
-        format!("{}[r{}{:?}]", layer, dst_index, self.get_imm32())
-    }
-
-    pub fn gen_address_imm(&self) -> String {
-        format!("L3[{:?}]", self.get_imm32())
     }
 }
 

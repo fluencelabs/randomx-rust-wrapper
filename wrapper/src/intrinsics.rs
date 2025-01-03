@@ -15,7 +15,7 @@
  */
 
  use core::arch::x86_64::{__m128d, __m128i, _mm_loadl_epi64, _mm_cvtepi32_pd};
-use std::arch::{asm, x86_64::{_mm_add_pd, _mm_and_pd, _mm_castsi128_pd, _mm_div_pd, _mm_loadu_pd, _mm_mul_pd, _mm_or_pd, _mm_set1_epi64x, _mm_set1_pd, _mm_set_epi64x, _mm_setcsr, _mm_shuffle_pd, _mm_sqrt_pd, _mm_store_pd, _mm_sub_pd, _mm_xor_pd}};
+use std::arch::{asm, x86_64::{_mm_add_pd, _mm_and_pd, _mm_castsi128_pd, _mm_div_pd, _mm_loadu_pd, _mm_mul_pd, _mm_or_pd, _mm_set1_epi64x, _mm_set_epi64x, _mm_shuffle_pd, _mm_sqrt_pd, _mm_store_pd, _mm_sub_pd, _mm_xor_pd}};
 
 use crate::registers::FpuRegister;
 
@@ -127,12 +127,34 @@ pub fn smulh(a: i64, b: i64) -> i64 {
 #[inline(always)]
 pub fn rx_set_rounding_mode(mode: u32) {
     let val: u32 = RX_MXCSR_DEFAULT | (mode << 13);
+    set_csr(val)
+}
+#[inline(always)]
+pub fn rx_reset_float_state() {
+    rx_set_rounding_mode(0)
+}
+
+#[inline(always)]
+pub fn get_csr() -> u32 {
+    let mut val: u32 = 0;
+    unsafe {
+        asm!(
+            "stmxcsr [{0}]",
+            in(reg) &mut val,
+            options(nostack, preserves_flags)
+        );
+    }
+    val
+}
+
+#[inline(always)]
+pub fn set_csr(val: u32) {
     unsafe {
         asm!(
             "ldmxcsr [{0}]",
             in(reg) &val,
             options(nostack, preserves_flags)
         );
-        // ldmxcsr(ptr::addr_of!(val) as *const i8);
     }
 }
+

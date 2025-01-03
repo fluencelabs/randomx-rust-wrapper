@@ -39,7 +39,12 @@ pub enum VmCreationError {
     IncorrectFastModeFlag { flags: RandomXFlags },
 
     #[error(
-        "to allocate vm in the light mode, flags {flags:?} must no contain the full mem option"
+        "to allocate vm in the light mode, flags {flags:?} must not contain the full mem option"
     )]
     IncorrectLightModeFlag { flags: RandomXFlags },
+
+    #[error(
+        "to allocate vm in the ironlight mode, flags {flags:?} must contain ironmode flag and must not contain the full mem option"
+    )]
+    IncorrectIronLightModeFlag { flags: RandomXFlags },
 }

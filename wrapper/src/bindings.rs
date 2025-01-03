@@ -14,6 +14,8 @@ pub mod flags {
     pub const randomx_flags_RANDOMX_FLAG_ARGON2_SSSE3: randomx_flags = 32;
     pub const randomx_flags_RANDOMX_FLAG_ARGON2_AVX2: randomx_flags = 64;
     pub const randomx_flags_RANDOMX_FLAG_ARGON2: randomx_flags = 96;
+    pub const randomx_flags_RANDOMX_FLAG_IRONLIGHT: randomx_flags = 128;
+
 
     pub type randomx_flags = ::std::os::raw::c_uint;
 
@@ -83,10 +85,6 @@ pub mod cache {
         "]
         pub fn randomx_release_cache(cache: *mut randomx_cache);
     }
-}
-
-pub mod program {
-    static RANDOMX_PROGRAM_SIZE: usize = 256;
 }
 
 pub mod dataset {
@@ -294,29 +292,20 @@ pub mod vm {
 pub mod entropy {
     extern "C" {
         pub fn randomx_blake2b(out: *mut ::std::os::raw::c_void, outlen: usize, in_ptr: *const ::std::os::raw::c_void, inlen: usize,
-            key: *const ::std::os::raw::c_void, keylen: usize);
+            key: *const ::std::os::raw::c_void, keylen: usize) -> i32;
     }
 
     extern "C" {
-        pub fn randomx_fill_aes_1rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+        pub fn randomx_fill_aes_1rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
     }
 
     extern "C" {
-        pub fn randomx_hash_aes_1rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
-    }
-
-    extern "C" {
-        pub fn randomx_fill_aes_4rx4(state: *mut ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+        pub fn randomx_fill_aes_4rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
     }
 }
 
-// WIP mb remove this one
-pub mod float_rounding {
+pub mod hashing {
     extern "C" {
-        pub fn randomx_reset_rounding_mode();
+        pub fn randomx_hash_aes_1rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
     }
 }
-
-
-// int blake2b(void *out, size_t outlen, const void *in, size_t inlen,
-//     const void *key, size_t keylen);
