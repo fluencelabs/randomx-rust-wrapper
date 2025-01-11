@@ -5,6 +5,8 @@
 #![allow(non_camel_case_types)]
 
 pub mod flags {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
     pub const randomx_flags_RANDOMX_FLAG_DEFAULT: randomx_flags = 0;
     pub const randomx_flags_RANDOMX_FLAG_LARGE_PAGES: randomx_flags = 1;
     pub const randomx_flags_RANDOMX_FLAG_HARD_AES: randomx_flags = 2;
@@ -33,6 +35,7 @@ pub mod flags {
 }
 
 pub mod cache {
+    #![allow(non_camel_case_types)]
     use super::flags::randomx_flags;
 
     #[repr(C)]
@@ -88,6 +91,8 @@ pub mod cache {
 }
 
 pub mod dataset {
+    #![allow(non_camel_case_types)]
+
     use std::os::raw::c_void;
 
     use super::cache::randomx_cache;
@@ -163,6 +168,8 @@ pub mod dataset {
 }
 
 pub mod vm {
+    #![allow(non_camel_case_types)]
+
     use super::cache::randomx_cache;
     use super::dataset::randomx_dataset;
     use super::flags::randomx_flags;

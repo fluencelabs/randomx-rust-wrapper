@@ -16,29 +16,36 @@
 
 use std::{os::raw::c_void, ptr};
 
-use crate::{
-    bindings::{
-        cache::randomx_cache,
-        dataset::randomx_init_dataset_item,
-        entropy::{randomx_blake2b, randomx_fill_aes_1rx4},
-        hashing::randomx_hash_aes_1rx4,
-    },
-    bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode},
-    constants::{CACHE_LINE_ALIGN_MASK, RANDOMX_SCRATCHPAD_L3, SCRATCHPAD_L3_MASK64},
-    intrinsics::{
-        get_csr, mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_reset_float_state, rx_store_vec_f128, rx_xor_vec_f128, set_csr
-    },
-    program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE},
-    registers::{
-        IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT,
-        REGISTER_COUNT_FLT,
-    },
-    result_hash::ToRawMut,
+use ccp_randomx::bindings::{
+    cache::randomx_cache,
+    dataset::randomx_init_dataset_item,
+    entropy::{randomx_blake2b, randomx_fill_aes_1rx4},
+    hashing::randomx_hash_aes_1rx4,
 };
-use ccp_randomx_types::ResultHash;
+
+use ccp_randomx::cache::CacheRawAPI;
+use ccp_randomx::result_hash::ToRawMut;
+use p3_baby_bear::BabyBear;
+use p3_field::Field;
+use p3_matrix::dense::RowMajorMatrix;
+use p3_uni_stark::{prove, verify, Proof};
+use sp1_stark::{inner_perm, BabyBearPoseidon2Inner, InnerChallenger};
 
 use crate::{
-    cache::CacheRawAPI,
+    bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode}, circuit::RxCircuit, constants::{
+        CACHE_LINE_ALIGN_MASK, CACHE_LINE_SIZE, CONST_EXPONENT_BITS, DATASET_EXTRA_ITEMS,
+        DYNAMIC_EXPONENT_BITS, EXPONENT_BIAS, EXPONENT_MASK, MANTISSA_MASK, MANTISSA_SIZE,
+        RANDOMX_SCRATCHPAD_L3, SCRATCHPAD_L3_MASK64, STATIC_EXPONENT_BITS,
+    }, intrinsics::{
+        get_csr, mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_reset_float_state,
+        rx_store_vec_f128, rx_xor_vec_f128, set_csr,
+    }, program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE}, registers::{
+        IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT, REGISTER_COUNT_FLT,
+    }, stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE}
+};
+use ccp_randomx_types::{ResultHash, RANDOMX_RESULT_SIZE};
+
+use crate::{
     program::{Program, ProgramConfiguration},
     registers::RegisterFile,
     RResult, RandomXFlags, VmCreationError,
@@ -48,16 +55,15 @@ use crate::{
 #[repr(C, align(16))]
 pub struct Aligned16(pub [u64; 8]);
 
-const MANTISSA_MASK: u64 = 0x000F_FFFF_FFFF_FFFF;
-const EXPONENT_BIAS: u64 = 0x3ff;
-const EXPONENT_MASK: u64 = 0x7ff;
-const MANTISSA_SIZE: u64 = 52;
-const CONST_EXPONENT_BITS: u64 = 0x300;
-const STATIC_EXPONENT_BITS: u64 = 4;
-const DYNAMIC_EXPONENT_BITS: u64 = 4;
-// constexpr
-const DATASET_EXTRA_ITEMS: usize = 0x7ffff;
-const CACHE_LINE_SIZE: usize = 64;
+impl ToRawMut for Aligned16 {
+    fn empty() -> Self {
+        Aligned16([0u64; 8])
+    }
+
+    fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
+        self.0.as_mut().as_mut_ptr() as *mut std::ffi::c_void
+    }
+}
 
 #[inline(always)]
 fn get_small_positive_float_bits(entropy: u64) -> u64 {
@@ -80,6 +86,34 @@ fn get_static_exponent(entropy: u64) -> u64 {
 fn get_float_mask(entropy: u64) -> u64 {
     const MASK_22BIT: u64 = (1u64 << 22) - 1;
     (entropy & MASK_22BIT) | get_static_exponent(entropy)
+}
+
+fn blake_hash<OUT: ToRawMut, IN: ?Sized>(
+    out: &mut OUT,
+    out_size: usize,
+    input: *const IN,
+    input_size: usize,
+) {
+    unsafe {
+        randomx_blake2b(
+            out.as_raw_mut(),
+            out_size,
+            input as *const std::ffi::c_void,
+            input_size,
+            ptr::null(),
+            0usize,
+        );
+    }
+}
+
+fn aes_1rx4_hash<OUT, IN>(state: *const IN, output_size: usize, buffer: *mut OUT) {
+    unsafe {
+        randomx_hash_aes_1rx4(
+            state as *mut std::ffi::c_void,
+            output_size,
+            buffer as *mut std::ffi::c_void,
+        );
+    }
 }
 
 fn dataset_read(
@@ -147,48 +181,104 @@ where
 
     /// Calculates a RandomX hash value.
     pub fn hash(&mut self, local_nonce: &[u8]) -> ResultHash {
-        // Watch out USE_CSR_INTRINSICS macro in randomx.cpp
         let fpstate = get_csr();
 
-        let mut temp_hash = Aligned16([0u64; 8]);
-        let temp_hash_ptr = temp_hash.0.as_mut_ptr() as *mut std::ffi::c_void;
-        let local_nonce_ptr = local_nonce.as_ptr() as *const std::ffi::c_void;
-        unsafe {
-            randomx_blake2b(
-                temp_hash_ptr,
-                std::mem::size_of::<Aligned16>(),
-                local_nonce_ptr,
-                local_nonce.len(),
-                ptr::null(),
-                0usize,
-            );
-        }
+        let mut temp_hash = Aligned16::empty();
+        let temp_hash_size = std::mem::size_of::<Aligned16>();
+        blake_hash(
+            &mut temp_hash,
+            temp_hash_size,
+            local_nonce,
+            local_nonce.len(),
+        );
 
         // let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
-
         // println!("Result hash: {}", hex_string);
-        // println! {""};
+
         self.init_scratchpad(&mut temp_hash);
         rx_reset_float_state();
 
-        for _ in 0..RANDOMX_PROGRAM_COUNT-1 {
+        for _ in 0..RANDOMX_PROGRAM_COUNT - 1 {
             self.run(&mut temp_hash);
-            let reg_ptr = &self.reg as *const RegisterFile as *const std::ffi::c_void;
-            unsafe {
-                let result = randomx_blake2b(
-                    temp_hash_ptr,
-                    std::mem::size_of::<Aligned16>(),
-                    reg_ptr,
-                    std::mem::size_of::<RegisterFile>(),
-                    ptr::null(),
-                    0usize,
-                );
-                assert!(result == 0);
-            }
+            blake_hash(
+                &mut temp_hash,
+                temp_hash_size,
+                self.reg.to_raw(),
+                std::mem::size_of::<RegisterFile>(),
+            );
         }
 
         let result = self.run_final(&mut temp_hash).get_final_result();
         set_csr(fpstate);
+        result
+    }
+
+    /// Calculates a RandomX hash value.
+    // pub fn prove_light(&mut self, local_nonce: &[u8]) -> (ResultHash, Proof<InnerBabyBearPoseidon2>) {
+    pub fn prove_light(&mut self, local_nonce: &[u8]) -> ResultHash {
+        let fpstate = get_csr();
+
+        let mut temp_hash = Aligned16([0u64; 8]);
+        let temp_hash_size = std::mem::size_of::<Aligned16>();
+
+        let states = BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_COUNT  * RANDOMX_PROGRAM_ITERATIONS;
+        println!("states: {:?}", states);
+        let mut stark_states:Vec<BabyBear> = Vec::with_capacity(states);
+
+        blake_hash(
+            &mut temp_hash,
+            temp_hash_size,
+            local_nonce,
+            local_nonce.len(),
+        );
+
+        // let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
+        // println!("Result hash: {}", hex_string);
+        // println! {""};
+
+        self.init_scratchpad(&mut temp_hash);
+        rx_reset_float_state();
+
+        for _ in 0..RANDOMX_PROGRAM_COUNT - 1 {
+            let mut next_records_batch = self.run_with_trace(&mut temp_hash);
+            blake_hash(
+                &mut temp_hash,
+                temp_hash_size,
+                self.reg.to_raw(),
+                std::mem::size_of::<RegisterFile>(),
+            );
+            stark_states.append(&mut next_records_batch);
+        }
+        println!("stark_states len : {:?}", stark_states.len());
+
+        let mut next_records_batch = self.run_with_trace(&mut temp_hash);
+        stark_states.append(&mut next_records_batch);
+        
+        println!("stark_states len : {:?}", stark_states.len());
+
+        let result = self.get_final_result();
+
+        set_csr(fpstate);
+
+        let perm = inner_perm();
+        let mut challenger = InnerChallenger::new(perm.clone());
+        let inner = BabyBearPoseidon2Inner::default();
+        let config = InnerBabyBearPoseidon2::new(inner.pcs);
+        let rx_circuit = RxCircuit {};
+
+        println!("stark_states len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
+        // TBD use split_off() with a separate tail prooving.
+        stark_states.truncate(4194304 * BIN_OP_ROW_SIZE);
+        println!("stark_states len {} : {:?}", stark_states.len(), stark_states.len() / BIN_OP_ROW_SIZE);
+
+        let stark_trace = RowMajorMatrix::new(stark_states, BIN_OP_ROW_SIZE);
+
+        let proof = prove(&config, &rx_circuit, &mut challenger, stark_trace, &vec![]);
+
+        let mut challenger = InnerChallenger::new(perm.clone());
+        // WIP
+        verify(&config, &rx_circuit, &mut challenger, &proof, &vec![]).unwrap();
+
         result
     }
 
@@ -217,7 +307,9 @@ where
         );
     }
 
-    fn execute(&mut self, program: &Program) {
+    fn execute<F: Field>(&mut self, program: &Program) -> Vec<F>{
+        let mut stark_states = Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_ITERATIONS);
+
         let mut nreg = NativeRegisterFile::from_fp_registers(&self.reg.a);
 
         let bytecode_machine = BytecodeMachine::from_components(
@@ -232,7 +324,7 @@ where
         //     println!("bytecode_machine.bytecode[19]: {:?} *isrc {}", a, *bytecode_machine.bytecode[19].isrc);
         // }
 
-        for ic in 0..RANDOMX_PROGRAM_ITERATIONS {
+        for _ in 0..RANDOMX_PROGRAM_ITERATIONS {
             let sp_mix: u64 =
                 nreg.r[self.config.read_reg0 as usize] ^ nreg.r[self.config.read_reg1 as usize];
             // println!(
@@ -283,8 +375,11 @@ where
                 }
             }
             // println!("before dataset_read nreg.r: {:?}", nreg.r);
-            bytecode_machine.execute_bytecode(&mut self.scratchpad, &self.config.e_mask, &nreg, ic);
+            let mut next_records_batch = bytecode_machine.execute_bytecode(&mut self.scratchpad, &self.config.e_mask);
+            // println!("execute  next_records_batch : {:?}", next_records_batch.len());
 
+            stark_states.append(&mut next_records_batch);
+            
             self.mem.mx ^= (nreg.r[self.config.read_reg2 as usize]
                 ^ nreg.r[self.config.read_reg3 as usize]) as u32;
             self.mem.mx &= CACHE_LINE_ALIGN_MASK;
@@ -327,12 +422,22 @@ where
         // println!("execute after bc exec reg.f {:?}", self.reg.f);
         self.reg.store_fpu_e(&nreg.e);
         // println!("execute after bc exec reg.e {:?}", self.reg.e);
+        stark_states
     }
 
     fn generate_and_run(&mut self, seed: &mut Aligned16) {
         let program = Program::with_seed(seed);
         self.initialize(&program);
-        self.execute(&program);
+        let _: Vec<BabyBear> = self.execute(&program);
+    }
+
+    fn generate_and_run_with_trace<F: Field>(&mut self, seed: &mut Aligned16) -> Vec<F> {
+        // WIP remove the division applied to the PROGRAM_SIZE const value
+        // let mut stark_states = Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE / 2 * RANDOMX_PROGRAM_COUNT  * RANDOMX_PROGRAM_ITERATIONS);
+
+        let program = Program::with_seed(seed);
+        self.initialize(&program);
+        self.execute(&program)
     }
 
     fn run_final(&mut self, seed: &mut Aligned16) -> &mut Self {
@@ -340,25 +445,24 @@ where
         self
     }
 
-    fn get_final_result(&self) -> ResultHash {
+    fn get_final_result(&mut self) -> ResultHash {
         let mut hash = ResultHash::empty();
         // let hash_ptr = hash.as_mut() as *const u8 as *mut std::ffi::c_void;
-        let scratchpad = self.scratchpad.as_ptr() as *mut std::ffi::c_void;
-        let aes_dst_ptr = self.reg.a.as_ptr() as *mut std::ffi::c_void;
+        // let scratchpad = self.scratchpad.as_ptr() as *mut std::ffi::c_void;
+        // let aes_dst_ptr = self.reg.a.as_ptr() as *mut std::ffi::c_void;
         // println!("final reg.r[0]: {:?}", self.reg.r[0]);
 
-        unsafe {
-            randomx_hash_aes_1rx4(scratchpad, RANDOMX_SCRATCHPAD_L3, aes_dst_ptr);
-            let reg_ptr = &self.reg as *const RegisterFile as *const std::ffi::c_void;
-            randomx_blake2b(
-                hash.as_raw_mut(),
-                32,
-                reg_ptr,
-                std::mem::size_of::<RegisterFile>(),
-                ptr::null(),
-                0usize,
-            );
-        }
+        aes_1rx4_hash(
+            self.scratchpad.as_ptr(),
+            RANDOMX_SCRATCHPAD_L3,
+            self.reg.a.as_mut_ptr(),
+        );
+        blake_hash(
+            &mut hash,
+            RANDOMX_RESULT_SIZE,
+            self.reg.to_raw(),
+            std::mem::size_of::<RegisterFile>(),
+        );
 
         hash
     }
@@ -373,5 +477,9 @@ where
 
     fn run(&mut self, seed: &mut Aligned16) {
         self.generate_and_run(seed)
+    }
+
+    fn run_with_trace<F: Field>(&mut self, seed: &mut Aligned16) -> Vec<F> {
+        self.generate_and_run_with_trace(seed)
     }
 }
