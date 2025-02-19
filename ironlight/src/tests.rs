@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
+use ccp_randomx::bindings::hashing::randomx_hash_aes_1rx4;
+use ccp_randomx::result_hash::ToRawMut;
 use tracing_forest::util::LevelFilter;
 use tracing_forest::ForestLayer;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Registry;
 
+use crate::ironlight::aes_1rx4_hash;
 use crate::Cache;
 use crate::RandomXFlags;
 use crate::IronLightVM;
@@ -105,4 +108,20 @@ fn prove_light_works() {
     println!("Expected result: {}", hex_string);
 
     assert_eq!(actual_result, expected_result);
+}
+
+#[test]
+fn tshoot_aes() {
+    println!("Input:");
+
+    let input = [42u8; 512];
+    let mut hash = [0u8; 512];
+
+    println!("Input: {:?}", input);
+    aes_1rx4_hash(&input, input.len(), &mut hash);
+    let hex_string: String = hash
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    println!("Result: {}", hex_string);
 }

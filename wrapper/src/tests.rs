@@ -18,7 +18,6 @@ use crate::Cache;
 use crate::Dataset;
 use crate::RandomXFlags;
 use crate::RandomXVM;
-// use crate::IronLightVM;
 use crate::ResultHash;
 
 fn run_light_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {

@@ -313,6 +313,6 @@ pub mod entropy {
 
 pub mod hashing {
     extern "C" {
-        pub fn randomx_hash_aes_1rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+        pub fn randomx_hash_aes_1rx4(input: *const ::std::os::raw::c_void, input_size: usize, hash: *mut ::std::os::raw::c_void);
     }
 }

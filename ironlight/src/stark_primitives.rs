@@ -16,31 +16,20 @@
 
 use p3_baby_bear::BabyBear;
 use p3_field::extension::BinomialExtensionField;
-use p3_uni_stark::StarkConfig;
+use p3_uni_stark::{Proof, StarkConfig};
 
 use sp1_stark::{InnerChallenger, InnerPcs};
-
-use crate::bytecode_machine::InstructionType;
 
 pub(crate) type Val = BabyBear;
 pub(crate) type Challenge = BinomialExtensionField<Val, 4>;
 pub(crate) type InnerBabyBearPoseidon2 = StarkConfig<InnerPcs, Challenge, InnerChallenger>;
+pub(crate) type P3Proof = Proof<InnerBabyBearPoseidon2>;
 
 // 1 instr cnt + InstructionType::Nop = 29 as ops flags + 8 arg1 + 8 arg2 + 8 res + 7 carry
 // Possible to optimize replacing InstructionType::Nop with 10 cat-s of math ops
 pub(crate) const BIN_OP_ROW_SIZE: usize = 61;
-pub(crate) const WORD_SIZE: usize = 8;
-pub(crate) const OP_TYPES: usize = InstructionType::Nop as usize;
 pub(crate) const CARRY: usize = 7;
 pub(crate) const LEFT_ARG: usize = 30;
 pub(crate) const RIGHT_ARG: usize = 38;
 pub(crate) const RESULT: usize = 46;
 pub(crate) const CARRY_START: usize = 54;
-
-// pub(crate) const BIN_OP_ROW_SIZE: usize = 32;
-// pub(crate) const WORD_SIZE: usize = 8;
-// pub(crate) const CARRY: usize = 7;
-// pub(crate) const LEFT_ARG: usize = 1;
-// pub(crate) const RIGHT_ARG: usize = 9;
-// pub(crate) const RESULT: usize = 17;
-// pub(crate) const CARRY_START: usize = 25;

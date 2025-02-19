@@ -50,6 +50,9 @@ sp1-core-executor = { git = "https://github.com/fluencelabs/sp1.git", branch = "
 sp1-core-machine = { git = "https://github.com/fluencelabs/sp1.git", branch = "fluence-v3.3.0"  }
 sp1-sdk = { git = "https://github.com/fluencelabs/sp1.git", branch = "fluence-v3.3.0" }
 
+hashbrown = "0.14.5"
+serde_json = "1.0.133"
+
 # TMP
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 tracing-forest = { version = "0.1.6", features = ["ansi", "smallvec"] }

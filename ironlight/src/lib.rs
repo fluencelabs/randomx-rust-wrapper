@@ -32,13 +32,14 @@ mod stark_primitives;
 
 pub mod alu;
 pub mod bytecode_machine;
-pub mod circuit;
+pub mod randomx_circuit;
 pub mod constants;
 pub mod instruction;
 pub mod intrinsics;
 pub mod ironlight;
 pub mod program;
 pub mod registers;
+pub mod utils;
 
 pub type RResult<T> = Result<T, errors::RandomXError>;
 

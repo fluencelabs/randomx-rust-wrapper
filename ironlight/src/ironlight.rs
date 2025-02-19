@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{os::raw::c_void, ptr};
+use std::{alloc::Layout, fs::File, io::Write, os::raw::c_void, ptr};
 
 use ccp_randomx::bindings::{
     cache::randomx_cache,
@@ -28,20 +28,29 @@ use ccp_randomx::result_hash::ToRawMut;
 use p3_baby_bear::BabyBear;
 use p3_field::Field;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_uni_stark::{prove, verify, Proof};
-use sp1_stark::{inner_perm, BabyBearPoseidon2Inner, InnerChallenger};
+use p3_uni_stark::{get_log_quotient_degree, prove, verify, Proof};
+use p3_util::{log2_ceil_usize, log2_strict_usize};
+use sp1_prover::components::DefaultProverComponents;
+use sp1_sdk::SP1Prover;
+use sp1_stark::{air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, inner_perm, BabyBearPoseidon2Inner, Chip, InnerChallenger, MachineProof, SP1ProverOpts, StarkMachine, StarkVerifyingKey};
 
 use crate::{
-    bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode}, circuit::RxCircuit, constants::{
+    bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode},
+    constants::{
         CACHE_LINE_ALIGN_MASK, CACHE_LINE_SIZE, CONST_EXPONENT_BITS, DATASET_EXTRA_ITEMS,
         DYNAMIC_EXPONENT_BITS, EXPONENT_BIAS, EXPONENT_MASK, MANTISSA_MASK, MANTISSA_SIZE,
         RANDOMX_SCRATCHPAD_L3, SCRATCHPAD_L3_MASK64, STATIC_EXPONENT_BITS,
-    }, intrinsics::{
+    },
+    intrinsics::{
         get_csr, mask_register_exponent_mantissa, rx_cvt_packed_int_vec_f128, rx_reset_float_state,
         rx_store_vec_f128, rx_xor_vec_f128, set_csr,
-    }, program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE}, registers::{
+    },
+    program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE},
+    randomx_circuit::{self, RandomXCircuit},
+    registers::{
         IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT, REGISTER_COUNT_FLT,
-    }, stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE}
+    },
+    stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE}, utils::{dummy_vk, get_sp1_core_proofdata, p3_proof_to_shardproof},
 };
 use ccp_randomx_types::{ResultHash, RANDOMX_RESULT_SIZE};
 
@@ -106,12 +115,12 @@ fn blake_hash<OUT: ToRawMut, IN: ?Sized>(
     }
 }
 
-fn aes_1rx4_hash<OUT, IN>(state: *const IN, output_size: usize, buffer: *mut OUT) {
+pub fn aes_1rx4_hash<OUT, IN>(input: *const IN, input_size: usize, hash: *mut OUT) {
     unsafe {
         randomx_hash_aes_1rx4(
-            state as *mut std::ffi::c_void,
-            output_size,
-            buffer as *mut std::ffi::c_void,
+            input as *const std::ffi::c_void,
+            input_size,
+            hash as *mut std::ffi::c_void,
         );
     }
 }
@@ -160,7 +169,17 @@ where
         }
 
         let config = ProgramConfiguration::default();
-        let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
+        // TBD move into a separate f
+        let scratchpad: Vec<u8>;
+        unsafe {
+            let size = RANDOMX_SCRATCHPAD_L3 * std::mem::size_of::<u8>();
+            let align = 16;
+            let layout = Layout::from_size_align(size, align).expect("Invalid layout");
+            let scratchpad_buf = std::alloc::alloc(layout) as *mut u8;
+            scratchpad = Vec::from_raw_parts(scratchpad_buf, size, size);
+        }
+
+        println!("scratchpad ptr: {:?}", scratchpad.as_ptr());
         let reg = RegisterFile::default();
         let mem = MemoryRegisters::default();
         let dataset_offset = 0;
@@ -221,9 +240,11 @@ where
         let mut temp_hash = Aligned16([0u64; 8]);
         let temp_hash_size = std::mem::size_of::<Aligned16>();
 
-        let states = BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_COUNT  * RANDOMX_PROGRAM_ITERATIONS;
-        println!("states: {:?}", states);
-        let mut stark_states:Vec<BabyBear> = Vec::with_capacity(states);
+        let states = BIN_OP_ROW_SIZE
+            * RANDOMX_PROGRAM_SIZE
+            * RANDOMX_PROGRAM_COUNT
+            * RANDOMX_PROGRAM_ITERATIONS;
+        let mut stark_states: Vec<BabyBear> = Vec::with_capacity(states);
 
         blake_hash(
             &mut temp_hash,
@@ -249,12 +270,12 @@ where
             );
             stark_states.append(&mut next_records_batch);
         }
-        println!("stark_states len : {:?}", stark_states.len());
+        println!("stark_states 1 len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
 
         let mut next_records_batch = self.run_with_trace(&mut temp_hash);
         stark_states.append(&mut next_records_batch);
-        
-        println!("stark_states len : {:?}", stark_states.len());
+
+        println!("stark_states 2 len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
 
         let result = self.get_final_result();
 
@@ -264,21 +285,95 @@ where
         let mut challenger = InnerChallenger::new(perm.clone());
         let inner = BabyBearPoseidon2Inner::default();
         let config = InnerBabyBearPoseidon2::new(inner.pcs);
-        let rx_circuit = RxCircuit {};
+        let rx_circuit = RandomXCircuit::<BabyBear>::new();
 
-        println!("stark_states len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
+        println!(
+            "stark_states 3 len : {:?}",
+            stark_states.len() / BIN_OP_ROW_SIZE
+        );
         // TBD use split_off() with a separate tail prooving.
-        stark_states.truncate(4194304 * BIN_OP_ROW_SIZE);
-        println!("stark_states len {} : {:?}", stark_states.len(), stark_states.len() / BIN_OP_ROW_SIZE);
+        // stark_states.truncate(4194304 * BIN_OP_ROW_SIZE);
+        stark_states.truncate(RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_ITERATIONS * RANDOMX_PROGRAM_COUNT * BIN_OP_ROW_SIZE);
+        println!(
+            "stark_states 4 len {} : {:?}",
+            stark_states.len(),
+            stark_states.len() / BIN_OP_ROW_SIZE
+        );
 
         let stark_trace = RowMajorMatrix::new(stark_states, BIN_OP_ROW_SIZE);
 
-        let proof = prove(&config, &rx_circuit, &mut challenger, stark_trace, &vec![]);
+        let initial_stark_proof =
+            prove(&config, &rx_circuit, &mut challenger, stark_trace, &vec![]);
 
         let mut challenger = InnerChallenger::new(perm.clone());
         // WIP
-        verify(&config, &rx_circuit, &mut challenger, &proof, &vec![]).unwrap();
+        verify(
+            &config,
+            &rx_circuit,
+            &mut challenger,
+            &initial_stark_proof,
+            &vec![],
+        )
+        .unwrap();
 
+
+        let log_quotient_degree = get_log_quotient_degree(&rx_circuit, 0, 0);
+        println!("main log_quotient_degree {}", log_quotient_degree);
+        // Need to reduce a number of chips created down to 1
+        // log_quotinent_degree is 4 for recursive and 1 for non-recursive
+        let chip = Chip::new_(rx_circuit, log_quotient_degree);
+        let chips = vec![chip];
+        let machine: StarkMachine<BabyBearPoseidon2, _> = StarkMachine::new(
+            BabyBearPoseidon2::new(),
+            chips,
+            SP1_PROOF_NUM_PV_ELTS,
+            false,
+        );
+
+        let prover = SP1Prover::<DefaultProverComponents>::new();
+        let opts = SP1ProverOpts::default();
+
+        // let core_proofdata = get_sp1_core_proofdata(initial_stark_proof);
+        // let vk: StarkVerifyingKey<BabyBearPoseidon2> = dummy_vk();
+
+        // let machine_proof = MachineProof {
+        //     shard_proofs: core_proofdata.0.to_vec(),
+        // };
+        // let mut challenger = InnerChallenger::new(perm.clone());
+        // let chip = &machine.chips()[0];
+        // machine
+        //     .verify_(&vk, &machine_proof, chip, &mut challenger)
+        //     .unwrap();
+
+        let shard_proof = p3_proof_to_shardproof(initial_stark_proof);
+        // println!(
+        //     "shard_proof.opening_proof.proof_queries {}",
+        //     serde_json::to_string_pretty(&shard_proof.opening_proof).unwrap(),
+        // );
+        let outer_proof = prover.wrap_bn254_(shard_proof, opts, &machine).unwrap();
+
+        // println!(
+        //     "wrapped_bn254 {:?}",
+        //     serde_json::to_string(&outer_proof.proof).unwrap().len()
+        // );
+
+        let groth16_bn254_artifacts = if sp1_prover::build::sp1_dev_mode() {
+            sp1_prover::build::try_build_groth16_bn254_artifacts_dev(
+                &outer_proof.vk,
+                &outer_proof.proof,
+            )
+        } else {
+            sp1_sdk::install::try_install_circuit_artifacts("groth16")
+        };
+
+        // let groth16_bn254_artifacts = sp1_sdk::install::try_install_circuit_artifacts("groth16");
+
+        let wrapped_bn254_proof =
+            prover.wrap_groth16_bn254(outer_proof, &groth16_bn254_artifacts);
+        // let mut file = File::create("groth16.proof").expect("Could not create file!");
+        // file.write_all(serde_json::to_string_pretty(&wrapped_bn254_proof).unwrap().as_bytes())
+        //     .expect("Cannot write to the file!");
+ 
         result
     }
 
@@ -307,8 +402,9 @@ where
         );
     }
 
-    fn execute<F: Field>(&mut self, program: &Program) -> Vec<F>{
-        let mut stark_states = Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_ITERATIONS);
+    fn execute<F: Field>(&mut self, program: &Program) -> Vec<F> {
+        let mut stark_states =
+            Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_ITERATIONS);
 
         let mut nreg = NativeRegisterFile::from_fp_registers(&self.reg.a);
 
@@ -328,8 +424,8 @@ where
             let sp_mix: u64 =
                 nreg.r[self.config.read_reg0 as usize] ^ nreg.r[self.config.read_reg1 as usize];
             // println!(
-            //     "RUN!!!! ic {} sp_mix {} {}",
-            //     ic, self.config.read_reg0, self.config.read_reg1
+            //     "RUN!!!! sp_mix {} {}",
+            //     self.config.read_reg0, self.config.read_reg1
             // );
 
             sp_addr0 ^= sp_mix;
@@ -375,11 +471,12 @@ where
                 }
             }
             // println!("before dataset_read nreg.r: {:?}", nreg.r);
-            let mut next_records_batch = bytecode_machine.execute_bytecode(&mut self.scratchpad, &self.config.e_mask);
+            let mut next_records_batch =
+                bytecode_machine.execute_bytecode(&mut self.scratchpad, &self.config.e_mask);
             // println!("execute  next_records_batch : {:?}", next_records_batch.len());
 
             stark_states.append(&mut next_records_batch);
-            
+
             self.mem.mx ^= (nreg.r[self.config.read_reg2 as usize]
                 ^ nreg.r[self.config.read_reg3 as usize]) as u32;
             self.mem.mx &= CACHE_LINE_ALIGN_MASK;
@@ -457,6 +554,7 @@ where
             RANDOMX_SCRATCHPAD_L3,
             self.reg.a.as_mut_ptr(),
         );
+        // println!("getFinalResult reg.a {:?}", self.reg.a);
         blake_hash(
             &mut hash,
             RANDOMX_RESULT_SIZE,

@@ -21,7 +21,7 @@ use std::ptr::{null, null_mut};
 use p3_field::Field;
 
 use crate::program::{InstructionsStorage, ProgramConfigurationEntropy, RANDOMX_PROGRAM_SIZE};
-use crate::stark_primitives::{BIN_OP_ROW_SIZE, CARRY, OP_TYPES};
+use crate::stark_primitives::{BIN_OP_ROW_SIZE, CARRY};
 use crate::{
     constants::{
         CONDITION_MASK, CONDITION_OFFSET, SCRATCHPAD_L1_MASK, SCRATCHPAD_L2_MASK,
@@ -129,13 +129,7 @@ fn sign_extend2s_compl(x: u32) -> u64 {
 
 pub fn populate_flags<F: Field>(instr: InstructionType) -> Vec<F> {
     let mut flags = vec![F::zero(); InstructionType::Nop as usize];
-    match instr {
-        InstructionType::IAddRs => flags[instr as usize] = F::one(),
-        InstructionType::IAddM => flags[instr as usize] = F::one(),
-        InstructionType::ISubR => flags[instr as usize] = F::one(),
-        InstructionType::ISubM => flags[instr as usize] = F::one(),
-        _ => {}
-    }
+    flags[instr as usize] = F::one();
     flags
 }
 
@@ -986,7 +980,5 @@ mod tests {
         println!("next_records_batch: {:?}", next_records_batch);
         assert_eq!(new_pc, pc as i16);
         assert_eq!(next_records_batch.len(), BIN_OP_ROW_SIZE);
-        // WIP
-        assert!(false);
     }
 }
