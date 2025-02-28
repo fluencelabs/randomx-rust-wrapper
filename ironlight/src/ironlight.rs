@@ -28,11 +28,13 @@ use ccp_randomx::result_hash::ToRawMut;
 use p3_baby_bear::BabyBear;
 use p3_field::Field;
 use p3_matrix::dense::RowMajorMatrix;
-use p3_uni_stark::{get_log_quotient_degree, prove, verify, Proof};
-use p3_util::{log2_ceil_usize, log2_strict_usize};
+use p3_uni_stark::{get_log_quotient_degree, prove, verify};
 use sp1_prover::components::DefaultProverComponents;
-use sp1_sdk::SP1Prover;
-use sp1_stark::{air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, inner_perm, BabyBearPoseidon2Inner, Chip, InnerChallenger, MachineProof, SP1ProverOpts, StarkMachine, StarkVerifyingKey};
+use sp1_sdk::{SP1Proof, SP1ProofWithPublicValues, SP1Prover, SP1PublicValues, SP1Stdin, SP1_CIRCUIT_VERSION};
+use sp1_stark::{
+    air::SP1_PROOF_NUM_PV_ELTS, baby_bear_poseidon2::BabyBearPoseidon2, inner_perm,
+    BabyBearPoseidon2Inner, Chip, InnerChallenger, SP1ProverOpts, StarkMachine,
+};
 
 use crate::{
     bytecode_machine::{BytecodeMachine, BytecodeStorage, InstructionByteCode},
@@ -50,7 +52,8 @@ use crate::{
     registers::{
         IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT, REGISTER_COUNT_FLT,
     },
-    stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE}, utils::{dummy_vk, get_sp1_core_proofdata, p3_proof_to_shardproof},
+    stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE},
+    utils::{dummy_vk, get_sp1_core_proofdata, p3_proof_to_shardproof},
 };
 use ccp_randomx_types::{ResultHash, RANDOMX_RESULT_SIZE};
 
@@ -270,12 +273,18 @@ where
             );
             stark_states.append(&mut next_records_batch);
         }
-        println!("stark_states 1 len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
+        println!(
+            "stark_states 1 len : {:?}",
+            stark_states.len() / BIN_OP_ROW_SIZE
+        );
 
         let mut next_records_batch = self.run_with_trace(&mut temp_hash);
         stark_states.append(&mut next_records_batch);
 
-        println!("stark_states 2 len : {:?}", stark_states.len() / BIN_OP_ROW_SIZE);
+        println!(
+            "stark_states 2 len : {:?}",
+            stark_states.len() / BIN_OP_ROW_SIZE
+        );
 
         let result = self.get_final_result();
 
@@ -293,7 +302,12 @@ where
         );
         // TBD use split_off() with a separate tail prooving.
         // stark_states.truncate(4194304 * BIN_OP_ROW_SIZE);
-        stark_states.truncate(RANDOMX_PROGRAM_SIZE * RANDOMX_PROGRAM_ITERATIONS * RANDOMX_PROGRAM_COUNT * BIN_OP_ROW_SIZE);
+        stark_states.truncate(
+            RANDOMX_PROGRAM_SIZE
+                * RANDOMX_PROGRAM_ITERATIONS
+                * RANDOMX_PROGRAM_COUNT
+                * BIN_OP_ROW_SIZE,
+        );
         println!(
             "stark_states 4 len {} : {:?}",
             stark_states.len(),
@@ -302,8 +316,9 @@ where
 
         let stark_trace = RowMajorMatrix::new(stark_states, BIN_OP_ROW_SIZE);
 
+        let public_values = vec![];        
         let initial_stark_proof =
-            prove(&config, &rx_circuit, &mut challenger, stark_trace, &vec![]);
+            prove(&config, &rx_circuit, &mut challenger, stark_trace, &public_values);
 
         let mut challenger = InnerChallenger::new(perm.clone());
         // WIP
@@ -315,7 +330,6 @@ where
             &vec![],
         )
         .unwrap();
-
 
         let log_quotient_degree = get_log_quotient_degree(&rx_circuit, 0, 0);
         println!("main log_quotient_degree {}", log_quotient_degree);
@@ -368,12 +382,55 @@ where
 
         // let groth16_bn254_artifacts = sp1_sdk::install::try_install_circuit_artifacts("groth16");
 
-        let wrapped_bn254_proof =
-            prover.wrap_groth16_bn254(outer_proof, &groth16_bn254_artifacts);
+        let wrapped_bn254_proof = prover.wrap_groth16_bn254(outer_proof, &groth16_bn254_artifacts);
+
+        prover
+            .verify_groth16_bn254_(&wrapped_bn254_proof, &groth16_bn254_artifacts)
+            .unwrap();
+
+        let public_values = SP1PublicValues::from(&vec![]);        
+        let stdin = SP1Stdin::new();
+        let sp1_proof = SP1ProofWithPublicValues {
+            proof: SP1Proof::Groth16(wrapped_bn254_proof),
+            stdin,
+            public_values,
+            sp1_version: SP1_CIRCUIT_VERSION.to_string(),
+        };
+
+        // let sp1_prover::Groth16Bn254Proof {
+        //     public_inputs,
+        //     mut encoded_proof,
+        //     mut raw_proof,
+        //     groth16_vkey_hash,
+        // } = wrapped_bn254_proof;
+
+        // unsafe {
+        //     encoded_proof.as_bytes_mut()[0] = encoded_proof.as_bytes()[0] + 1;
+        // }
+
+        // unsafe {
+        //     raw_proof.as_bytes_mut()[0]  = encoded_proof.as_bytes()[0] + 1;
+        // }
+
+        // let wrapped_bn254_proof = sp1_prover::Groth16Bn254Proof {
+        //     public_inputs,
+        //     encoded_proof,
+        //     raw_proof,
+        //     groth16_vkey_hash,
+        // };
+
+        let solidity_proof = sp1_proof.bytes();
+        println!("proof: 0x{}", hex::encode(solidity_proof));
+        println!("raw_proof: 0x{}", hex::encode(sp1_proof.proof.clone().try_as_groth_16().unwrap().raw_proof));
+        println!("encoded_proof: 0x{}", hex::encode(sp1_proof.proof.clone().try_as_groth_16().unwrap().encoded_proof));
+        println!("public inputs: {:?}", sp1_proof.proof.clone().try_as_groth_16().unwrap().public_inputs);
+        println!("vkey hash: 0x{}", hex::encode(sp1_proof.proof.try_as_groth_16().unwrap().groth16_vkey_hash));
+        // sp1_proof.save("ironlight_groth16.bin").unwrap();
+
         // let mut file = File::create("groth16.proof").expect("Could not create file!");
-        // file.write_all(serde_json::to_string_pretty(&wrapped_bn254_proof).unwrap().as_bytes())
-        //     .expect("Cannot write to the file!");
- 
+        // file.write_all(serde_json::to_string(&wrapped_bn254_proof).unwrap().as_bytes())
+        // .expect("Cannot write to the file!");
+
         result
     }
 

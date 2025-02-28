@@ -3187,8 +3187,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "p3-air"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -3196,8 +3195,7 @@ dependencies = [
 
 [[package]]
 name = "p3-baby-bear"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "num-bigint 0.4.6",
  "p3-field",
@@ -3210,8 +3208,7 @@ dependencies = [
 
 [[package]]
 name = "p3-blake3"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "blake3",
  "p3-symmetric",
@@ -3219,8 +3216,7 @@ dependencies = [
 
 [[package]]
 name = "p3-bn254-fr"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "ff 0.13.0",
  "num-bigint 0.4.6",
@@ -3233,8 +3229,7 @@ dependencies = [
 
 [[package]]
 name = "p3-challenger"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-field",
  "p3-maybe-rayon",
@@ -3246,8 +3241,7 @@ dependencies = [
 
 [[package]]
 name = "p3-circle"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-challenger",
@@ -3262,8 +3256,7 @@ dependencies = [
 
 [[package]]
 name = "p3-commit"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-challenger",
@@ -3275,8 +3268,7 @@ dependencies = [
 
 [[package]]
 name = "p3-dft"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -3287,8 +3279,7 @@ dependencies = [
 
 [[package]]
 name = "p3-field"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint 0.4.6",
@@ -3300,8 +3291,7 @@ dependencies = [
 
 [[package]]
 name = "p3-fri"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-challenger",
@@ -3318,8 +3308,7 @@ dependencies = [
 
 [[package]]
 name = "p3-interpolation"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-field",
  "p3-matrix",
@@ -3328,8 +3317,7 @@ dependencies = [
 
 [[package]]
 name = "p3-keccak"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-symmetric",
  "tiny-keccak",
@@ -3337,8 +3325,7 @@ dependencies = [
 
 [[package]]
 name = "p3-keccak-air"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-air",
  "p3-field",
@@ -3350,8 +3337,7 @@ dependencies = [
 
 [[package]]
 name = "p3-matrix"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-field",
@@ -3364,16 +3350,14 @@ dependencies = [
 
 [[package]]
 name = "p3-maybe-rayon"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "rayon",
 ]
 
 [[package]]
 name = "p3-mds"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-dft",
@@ -3386,8 +3370,7 @@ dependencies = [
 
 [[package]]
 name = "p3-merkle-tree"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-commit",
@@ -3402,8 +3385,7 @@ dependencies = [
 
 [[package]]
 name = "p3-mersenne-31"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint 0.4.6",
@@ -3421,8 +3403,7 @@ dependencies = [
 
 [[package]]
 name = "p3-poseidon"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "p3-field",
  "p3-mds",
@@ -3432,8 +3413,7 @@ dependencies = [
 
 [[package]]
 name = "p3-poseidon2"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "gcd",
  "p3-field",
@@ -3445,8 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "p3-symmetric"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-field",
@@ -3455,8 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "p3-uni-stark"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "itertools 0.12.1",
  "p3-air",
@@ -3473,8 +3451,7 @@ dependencies = [
 
 [[package]]
 name = "p3-util"
-version = "0.1.6-succinct"
-source = "git+https://github.com/Plonky3/Plonky3.git?branch=sp1-v4#33c0dcbaa58792fdeab302871801018c2e36ec92"
+version = "0.1.0"
 dependencies = [
  "serde",
 ]
@@ -4738,7 +4715,6 @@ dependencies = [
 [[package]]
 name = "sp1-core-executor"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -4771,7 +4747,6 @@ dependencies = [
 [[package]]
 name = "sp1-core-machine"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -4818,7 +4793,6 @@ dependencies = [
 [[package]]
 name = "sp1-curves"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "cfg-if",
  "curve25519-dalek",
@@ -4839,7 +4813,6 @@ dependencies = [
 [[package]]
 name = "sp1-derive"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -4848,7 +4821,6 @@ dependencies = [
 [[package]]
 name = "sp1-primitives"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "bincode",
  "hex",
@@ -4865,7 +4837,6 @@ dependencies = [
 [[package]]
 name = "sp1-prover"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "anyhow",
  "bincode",
@@ -4908,7 +4879,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-circuit"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "hashbrown 0.14.5",
  "itertools 0.13.0",
@@ -4943,7 +4913,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-compiler"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "backtrace",
  "itertools 0.13.0",
@@ -4964,7 +4933,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-core"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "backtrace",
  "ff 0.13.0",
@@ -4999,7 +4967,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-derive"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -5008,7 +4975,6 @@ dependencies = [
 [[package]]
 name = "sp1-recursion-gnark-ffi"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "anyhow",
  "bincode",
@@ -5033,7 +4999,6 @@ dependencies = [
 [[package]]
 name = "sp1-sdk"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "alloy-sol-types",
  "anyhow",
@@ -5073,7 +5038,6 @@ dependencies = [
 [[package]]
 name = "sp1-stark"
 version = "3.3.0"
-source = "git+https://github.com/fluencelabs/sp1.git?branch=fluence-v3.3.0#57573c94cf35113fa62863ad35dc9da2f5d1c88d"
 dependencies = [
  "arrayref",
  "getrandom",
