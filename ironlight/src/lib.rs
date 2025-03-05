@@ -16,15 +16,15 @@
 
 #![warn(rust_2018_idioms)]
 #![warn(rust_2021_compatibility)]
-// #![deny(
-//     dead_code,
-//     nonstandard_style,
-//     unused_imports,
-//     unused_mut,
-//     unused_variables,
-//     unused_unsafe,
-//     unreachable_patterns
-// )]
+#![deny(
+    dead_code,
+    nonstandard_style,
+    unused_imports,
+    unused_mut,
+    unused_variables,
+    unused_unsafe,
+    unreachable_patterns
+)]
 
 #[cfg(test)]
 mod tests;

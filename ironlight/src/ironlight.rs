@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{alloc::Layout, fs::File, io::Write, os::raw::c_void, ptr};
+use std::{alloc::Layout, os::raw::c_void, ptr};
 
 use ccp_randomx::bindings::{
     cache::randomx_cache,
@@ -48,12 +48,12 @@ use crate::{
         rx_store_vec_f128, rx_xor_vec_f128, set_csr,
     },
     program::{RANDOMX_PROGRAM_COUNT, RANDOMX_PROGRAM_ITERATIONS, RANDOMX_PROGRAM_SIZE},
-    randomx_circuit::{self, RandomXCircuit},
+    randomx_circuit::RandomXCircuit,
     registers::{
         IntRegisterArray, MemoryRegisters, NativeRegisterFile, REGISTER_COUNT, REGISTER_COUNT_FLT,
     },
     stark_primitives::{InnerBabyBearPoseidon2, BIN_OP_ROW_SIZE},
-    utils::{dummy_vk, get_sp1_core_proofdata, p3_proof_to_shardproof},
+    utils::p3_proof_to_shardproof,
 };
 use ccp_randomx_types::{ResultHash, RANDOMX_RESULT_SIZE};
 
@@ -63,7 +63,18 @@ use crate::{
     RResult, RandomXFlags, VmCreationError,
 };
 
-// WIP
+#[derive(Clone, Debug)]
+pub struct HashWithGroth16Prove {
+    pub hash: ResultHash,
+    pub proof: Vec<u8>,
+}
+
+impl HashWithGroth16Prove {
+    fn new(hash: ResultHash, proof: Vec<u8>) -> Self {
+        Self { hash, proof }
+    }
+}
+
 #[repr(C, align(16))]
 pub struct Aligned16(pub [u64; 8]);
 
@@ -141,13 +152,9 @@ fn dataset_read(
         randomx_init_dataset_item(cache, rl_ptr, item_number);
     }
 
-    // println!("dataset_read r: {:?}", r);
-    // println!("dataset_read rl: {:?}", rl);
-
     for i in 0..REGISTER_COUNT {
         rl[i] = r[i] ^ rl[i];
     }
-    // println!("dataset_read rl: {:?}", rl);
 
     rl
 }
@@ -182,7 +189,6 @@ where
             scratchpad = Vec::from_raw_parts(scratchpad_buf, size, size);
         }
 
-        println!("scratchpad ptr: {:?}", scratchpad.as_ptr());
         let reg = RegisterFile::default();
         let mem = MemoryRegisters::default();
         let dataset_offset = 0;
@@ -214,9 +220,6 @@ where
             local_nonce.len(),
         );
 
-        // let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
-        // println!("Result hash: {}", hex_string);
-
         self.init_scratchpad(&mut temp_hash);
         rx_reset_float_state();
 
@@ -236,8 +239,7 @@ where
     }
 
     /// Calculates a RandomX hash value.
-    // pub fn prove_light(&mut self, local_nonce: &[u8]) -> (ResultHash, Proof<InnerBabyBearPoseidon2>) {
-    pub fn prove_light(&mut self, local_nonce: &[u8]) -> ResultHash {
+    pub fn prove_light(&mut self, local_nonce: &[u8]) -> HashWithGroth16Prove {
         let fpstate = get_csr();
 
         let mut temp_hash = Aligned16([0u64; 8]);
@@ -256,10 +258,6 @@ where
             local_nonce.len(),
         );
 
-        // let hex_string: String = temp_hash.0.iter().map(|b| format!("{:x}", b)).collect();
-        // println!("Result hash: {}", hex_string);
-        // println! {""};
-
         self.init_scratchpad(&mut temp_hash);
         rx_reset_float_state();
 
@@ -273,18 +271,9 @@ where
             );
             stark_states.append(&mut next_records_batch);
         }
-        println!(
-            "stark_states 1 len : {:?}",
-            stark_states.len() / BIN_OP_ROW_SIZE
-        );
 
         let mut next_records_batch = self.run_with_trace(&mut temp_hash);
         stark_states.append(&mut next_records_batch);
-
-        println!(
-            "stark_states 2 len : {:?}",
-            stark_states.len() / BIN_OP_ROW_SIZE
-        );
 
         let result = self.get_final_result();
 
@@ -296,10 +285,6 @@ where
         let config = InnerBabyBearPoseidon2::new(inner.pcs);
         let rx_circuit = RandomXCircuit::<BabyBear>::new();
 
-        println!(
-            "stark_states 3 len : {:?}",
-            stark_states.len() / BIN_OP_ROW_SIZE
-        );
         // TBD use split_off() with a separate tail prooving.
         // stark_states.truncate(4194304 * BIN_OP_ROW_SIZE);
         stark_states.truncate(
@@ -307,11 +292,6 @@ where
                 * RANDOMX_PROGRAM_ITERATIONS
                 * RANDOMX_PROGRAM_COUNT
                 * BIN_OP_ROW_SIZE,
-        );
-        println!(
-            "stark_states 4 len {} : {:?}",
-            stark_states.len(),
-            stark_states.len() / BIN_OP_ROW_SIZE
         );
 
         let stark_trace = RowMajorMatrix::new(stark_states, BIN_OP_ROW_SIZE);
@@ -332,9 +312,6 @@ where
         .unwrap();
 
         let log_quotient_degree = get_log_quotient_degree(&rx_circuit, 0, 0);
-        println!("main log_quotient_degree {}", log_quotient_degree);
-        // Need to reduce a number of chips created down to 1
-        // log_quotinent_degree is 4 for recursive and 1 for non-recursive
         let chip = Chip::new_(rx_circuit, log_quotient_degree);
         let chips = vec![chip];
         let machine: StarkMachine<BabyBearPoseidon2, _> = StarkMachine::new(
@@ -347,29 +324,8 @@ where
         let prover = SP1Prover::<DefaultProverComponents>::new();
         let opts = SP1ProverOpts::default();
 
-        // let core_proofdata = get_sp1_core_proofdata(initial_stark_proof);
-        // let vk: StarkVerifyingKey<BabyBearPoseidon2> = dummy_vk();
-
-        // let machine_proof = MachineProof {
-        //     shard_proofs: core_proofdata.0.to_vec(),
-        // };
-        // let mut challenger = InnerChallenger::new(perm.clone());
-        // let chip = &machine.chips()[0];
-        // machine
-        //     .verify_(&vk, &machine_proof, chip, &mut challenger)
-        //     .unwrap();
-
         let shard_proof = p3_proof_to_shardproof(initial_stark_proof);
-        // println!(
-        //     "shard_proof.opening_proof.proof_queries {}",
-        //     serde_json::to_string_pretty(&shard_proof.opening_proof).unwrap(),
-        // );
         let outer_proof = prover.wrap_bn254_(shard_proof, opts, &machine).unwrap();
-
-        // println!(
-        //     "wrapped_bn254 {:?}",
-        //     serde_json::to_string(&outer_proof.proof).unwrap().len()
-        // );
 
         let groth16_bn254_artifacts = if sp1_prover::build::sp1_dev_mode() {
             sp1_prover::build::try_build_groth16_bn254_artifacts_dev(
@@ -380,8 +336,6 @@ where
             sp1_sdk::install::try_install_circuit_artifacts("groth16")
         };
 
-        // let groth16_bn254_artifacts = sp1_sdk::install::try_install_circuit_artifacts("groth16");
-
         let wrapped_bn254_proof = prover.wrap_groth16_bn254(outer_proof, &groth16_bn254_artifacts);
 
         prover
@@ -390,48 +344,14 @@ where
 
         let public_values = SP1PublicValues::from(&vec![]);        
         let stdin = SP1Stdin::new();
-        let sp1_proof = SP1ProofWithPublicValues {
+        let groth16_proof = SP1ProofWithPublicValues {
             proof: SP1Proof::Groth16(wrapped_bn254_proof),
             stdin,
             public_values,
             sp1_version: SP1_CIRCUIT_VERSION.to_string(),
         };
 
-        // let sp1_prover::Groth16Bn254Proof {
-        //     public_inputs,
-        //     mut encoded_proof,
-        //     mut raw_proof,
-        //     groth16_vkey_hash,
-        // } = wrapped_bn254_proof;
-
-        // unsafe {
-        //     encoded_proof.as_bytes_mut()[0] = encoded_proof.as_bytes()[0] + 1;
-        // }
-
-        // unsafe {
-        //     raw_proof.as_bytes_mut()[0]  = encoded_proof.as_bytes()[0] + 1;
-        // }
-
-        // let wrapped_bn254_proof = sp1_prover::Groth16Bn254Proof {
-        //     public_inputs,
-        //     encoded_proof,
-        //     raw_proof,
-        //     groth16_vkey_hash,
-        // };
-
-        let solidity_proof = sp1_proof.bytes();
-        println!("proof: 0x{}", hex::encode(solidity_proof));
-        println!("raw_proof: 0x{}", hex::encode(sp1_proof.proof.clone().try_as_groth_16().unwrap().raw_proof));
-        println!("encoded_proof: 0x{}", hex::encode(sp1_proof.proof.clone().try_as_groth_16().unwrap().encoded_proof));
-        println!("public inputs: {:?}", sp1_proof.proof.clone().try_as_groth_16().unwrap().public_inputs);
-        println!("vkey hash: 0x{}", hex::encode(sp1_proof.proof.try_as_groth_16().unwrap().groth16_vkey_hash));
-        // sp1_proof.save("ironlight_groth16.bin").unwrap();
-
-        // let mut file = File::create("groth16.proof").expect("Could not create file!");
-        // file.write_all(serde_json::to_string(&wrapped_bn254_proof).unwrap().as_bytes())
-        // .expect("Cannot write to the file!");
-
-        result
+        HashWithGroth16Prove::new(result, groth16_proof.bytes()) 
     }
 
     // test
@@ -473,17 +393,10 @@ where
 
         let mut sp_addr0 = self.mem.mx as u64;
         let mut sp_addr1 = self.mem.ma as u64;
-        // unsafe {
-        //     println!("bytecode_machine.bytecode[19]: {:?} *isrc {}", a, *bytecode_machine.bytecode[19].isrc);
-        // }
 
         for _ in 0..RANDOMX_PROGRAM_ITERATIONS {
             let sp_mix: u64 =
                 nreg.r[self.config.read_reg0 as usize] ^ nreg.r[self.config.read_reg1 as usize];
-            // println!(
-            //     "RUN!!!! sp_mix {} {}",
-            //     self.config.read_reg0, self.config.read_reg1
-            // );
 
             sp_addr0 ^= sp_mix;
             sp_addr0 &= SCRATCHPAD_L3_MASK64 as u64;
@@ -498,10 +411,6 @@ where
                 unsafe {
                     nreg.r[i] ^= *scratchpad_entropy;
                 }
-                // println!(
-                //     "execute init from sp_addr0 {} load in reg.r: {:?}",
-                //     sp_addr0, nreg.r[i]
-                // );
             }
 
             for i in 0..REGISTER_COUNT_FLT {
@@ -511,7 +420,6 @@ where
                 unsafe {
                     nreg.f[i] = rx_cvt_packed_int_vec_f128(scratchpad_entropy);
                 }
-                // println!("execute init load in reg.f[i]: {:?}", nreg.f[i]);
             }
 
             for i in 0..REGISTER_COUNT_FLT {
@@ -524,13 +432,10 @@ where
                         &self.config.e_mask,
                         scratchpad_entropy_vector,
                     );
-                    // println!("init e in reg.e[i]: {:?} a {:?} e_mask {:?}", nreg.e[i], scratchpad_entropy_vector, &self.config.e_mask);
                 }
             }
-            // println!("before dataset_read nreg.r: {:?}", nreg.r);
             let mut next_records_batch =
                 bytecode_machine.execute_bytecode(&mut self.scratchpad, &self.config.e_mask);
-            // println!("execute  next_records_batch : {:?}", next_records_batch.len());
 
             stark_states.append(&mut next_records_batch);
 
@@ -554,12 +459,10 @@ where
             }
 
             for i in 0..REGISTER_COUNT_FLT {
-                // println!("execute before bc exec nreg.e[i]:  {:?} nreg.f[i] {:?}", nreg.e[i], nreg.f[i]);
                 nreg.f[i] = rx_xor_vec_f128(nreg.f[i], nreg.e[i]);
             }
 
             for i in 0..REGISTER_COUNT_FLT {
-                // scratchpad + spAddr0 + 16 * i
                 let entropy_address = sp_addr0 as usize + 16usize * i;
                 let scratchpad_dst = &mut self.scratchpad[entropy_address] as *mut u8 as *mut f64;
                 rx_store_vec_f128(scratchpad_dst, &nreg.f[i]);
@@ -570,12 +473,9 @@ where
         }
 
         self.reg.r = nreg.r;
-        // println!("execute reg.r: {:?}", self.reg.r);
 
         self.reg.store_fpu_f(&nreg.f);
-        // println!("execute after bc exec reg.f {:?}", self.reg.f);
         self.reg.store_fpu_e(&nreg.e);
-        // println!("execute after bc exec reg.e {:?}", self.reg.e);
         stark_states
     }
 
@@ -586,9 +486,6 @@ where
     }
 
     fn generate_and_run_with_trace<F: Field>(&mut self, seed: &mut Aligned16) -> Vec<F> {
-        // WIP remove the division applied to the PROGRAM_SIZE const value
-        // let mut stark_states = Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE / 2 * RANDOMX_PROGRAM_COUNT  * RANDOMX_PROGRAM_ITERATIONS);
-
         let program = Program::with_seed(seed);
         self.initialize(&program);
         self.execute(&program)
@@ -601,17 +498,12 @@ where
 
     fn get_final_result(&mut self) -> ResultHash {
         let mut hash = ResultHash::empty();
-        // let hash_ptr = hash.as_mut() as *const u8 as *mut std::ffi::c_void;
-        // let scratchpad = self.scratchpad.as_ptr() as *mut std::ffi::c_void;
-        // let aes_dst_ptr = self.reg.a.as_ptr() as *mut std::ffi::c_void;
-        // println!("final reg.r[0]: {:?}", self.reg.r[0]);
 
         aes_1rx4_hash(
             self.scratchpad.as_ptr(),
             RANDOMX_SCRATCHPAD_L3,
             self.reg.a.as_mut_ptr(),
         );
-        // println!("getFinalResult reg.a {:?}", self.reg.a);
         blake_hash(
             &mut hash,
             RANDOMX_RESULT_SIZE,

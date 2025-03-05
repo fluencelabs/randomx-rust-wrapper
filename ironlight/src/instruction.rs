@@ -15,8 +15,6 @@
  */
 use std::fmt;
 
-
-
 // WIP align is questionable here
 #[repr(C, align(8))]
 #[derive(Debug, Copy, Clone)]

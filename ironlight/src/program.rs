@@ -23,8 +23,8 @@ use crate::{
 use std::fmt;
 
 pub(crate) static RANDOMX_PROGRAM_SIZE: usize = 256;
-pub(crate) static RANDOMX_PROGRAM_ITERATIONS: usize = 512;
-pub(crate) static RANDOMX_PROGRAM_COUNT: usize = 4;
+pub(crate) static RANDOMX_PROGRAM_ITERATIONS: usize = 2048;
+pub(crate) static RANDOMX_PROGRAM_COUNT: usize = 8;
 pub(crate) static PROGRAM_ENTROPY_BUFFER_SIZE: usize = 16;
 
 pub(crate) type ProgramConfigurationEntropy = [u64; 2];

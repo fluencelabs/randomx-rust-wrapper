@@ -17,7 +17,7 @@
 use std::
     arch::x86_64::{_mm_load_pd, _mm_setzero_pd};
 
-use ccp_randomx::result_hash::ToRawMut;
+// use ccp_randomx::result_hash::ToRawMut;
 
 use crate::intrinsics::{rx_store_fpu_as_vec_f128, NativeFpuRegister};
 

@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-use ccp_randomx::bindings::hashing::randomx_hash_aes_1rx4;
-use ccp_randomx::result_hash::ToRawMut;
 use tracing_forest::util::LevelFilter;
 use tracing_forest::ForestLayer;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Registry;
 
 use crate::ironlight::aes_1rx4_hash;
+use crate::ironlight::HashWithGroth16Prove;
 use crate::Cache;
 use crate::RandomXFlags;
 use crate::IronLightVM;
@@ -33,7 +32,7 @@ fn run_ironlight_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomX
     vm.hash(&local_nonce)
 }
 
-fn run_prove_light(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> ResultHash {
+fn run_prove_light(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> HashWithGroth16Prove {
     let cache = Cache::new(&global_nonce, flags).unwrap();
     let mut vm = IronLightVM::new(cache, flags).unwrap();
     vm.prove_light(&local_nonce)
@@ -88,13 +87,14 @@ fn prove_light_works() {
         .with(ForestLayer::default())
         .init();
 
-    let actual_result = run_prove_light(&global_nonce, &local_nonce, flags);
-    let hex_string: String = actual_result
+    let HashWithGroth16Prove {hash, proof} = run_prove_light(&global_nonce, &local_nonce, flags);
+    let hex_string: String = hash
         .into_slice()
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
 
+    println!("Groth16 proof: {}", hex::encode(proof));
     println!("Result: {}", hex_string);
     let expected_result = ResultHash::from_slice([
         133, 95, 150, 177, 51, 99, 179, 126, 55, 33, 61, 139, 120, 240, 233, 99, 78, 17, 195, 171,

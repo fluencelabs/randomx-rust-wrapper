@@ -151,12 +151,10 @@ pub fn populate_add_trace_record<F: Field>(
     let right_as_b = right.to_le_bytes();
     let res_as_b = res.to_le_bytes();
 
-    // println!("left_as_b: {:?}", left_as_b);
     for el in left_as_b {
         trace_record.push(F::from_canonical_u8(el));
     }
 
-    // println!("right_as_b: {:?}", right_as_b);
     for el in right_as_b {
         trace_record.push(F::from_canonical_u8(el));
     }
@@ -904,7 +902,7 @@ impl<'bytecode> BytecodeMachine<'bytecode> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_imports)]
 mod tests {
     use p3_baby_bear::BabyBear;
 
@@ -974,10 +972,9 @@ mod tests {
 
         let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
         let config_entropy = ProgramConfigurationEntropy::default();
-        let BCExecutionResult(new_pc, mut next_records_batch) =
+        let BCExecutionResult(new_pc, next_records_batch) =
             bc.execute::<BabyBear>(pc as i16, &scratchpad, &config_entropy);
 
-        println!("next_records_batch: {:?}", next_records_batch);
         assert_eq!(new_pc, pc as i16);
         assert_eq!(next_records_batch.len(), BIN_OP_ROW_SIZE);
     }
