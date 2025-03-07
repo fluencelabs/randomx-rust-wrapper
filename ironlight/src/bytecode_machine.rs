@@ -688,7 +688,7 @@ impl InstructionByteCode {
     fn execute<F: Field>(
         &self,
         pc: i16,
-        scratchpad: &[u8],
+        scratchpad: &mut [u8],
         config_entropy: &ProgramConfigurationEntropy,
     ) -> BCExecutionResult<F> {
         let mut new_pc = pc;
@@ -885,7 +885,7 @@ impl<'bytecode> BytecodeMachine<'bytecode> {
 
     pub(crate) fn execute_bytecode<F: Field>(
         &self,
-        scratchpad: &[u8],
+        scratchpad: &mut [u8],
         config_entropy: &[u64; 2],
     ) -> Vec<F> {
         let mut stark_states = Vec::with_capacity(BIN_OP_ROW_SIZE * RANDOMX_PROGRAM_SIZE);
@@ -970,10 +970,10 @@ mod tests {
 
         bc.modify_with_instruction(&instr, pc, &mut nreg, &mut register_usage);
 
-        let scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
+        let mut scratchpad = vec![0; RANDOMX_SCRATCHPAD_L3];
         let config_entropy = ProgramConfigurationEntropy::default();
         let BCExecutionResult(new_pc, next_records_batch) =
-            bc.execute::<BabyBear>(pc as i16, &scratchpad, &config_entropy);
+            bc.execute::<BabyBear>(pc as i16, &mut scratchpad, &config_entropy);
 
         assert_eq!(new_pc, pc as i16);
         assert_eq!(next_records_batch.len(), BIN_OP_ROW_SIZE);

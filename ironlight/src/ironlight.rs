@@ -64,12 +64,12 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct HashWithGroth16Prove {
+pub struct HashWithGroth16Proof {
     pub hash: ResultHash,
     pub proof: Vec<u8>,
 }
 
-impl HashWithGroth16Prove {
+impl HashWithGroth16Proof {
     fn new(hash: ResultHash, proof: Vec<u8>) -> Self {
         Self { hash, proof }
     }
@@ -239,7 +239,7 @@ where
     }
 
     /// Calculates a RandomX hash value.
-    pub fn prove_light(&mut self, local_nonce: &[u8]) -> HashWithGroth16Prove {
+    pub fn prove_light(&mut self, local_nonce: &[u8]) -> HashWithGroth16Proof {
         let fpstate = get_csr();
 
         let mut temp_hash = Aligned16([0u64; 8]);
@@ -351,7 +351,7 @@ where
             sp1_version: SP1_CIRCUIT_VERSION.to_string(),
         };
 
-        HashWithGroth16Prove::new(result, groth16_proof.bytes()) 
+        HashWithGroth16Proof::new(result, groth16_proof.bytes()) 
     }
 
     // test

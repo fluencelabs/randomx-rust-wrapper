@@ -20,7 +20,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Registry;
 
 use crate::ironlight::aes_1rx4_hash;
-use crate::ironlight::HashWithGroth16Prove;
+use crate::ironlight::HashWithGroth16Proof;
 use crate::Cache;
 use crate::RandomXFlags;
 use crate::IronLightVM;
@@ -32,7 +32,7 @@ fn run_ironlight_randomx(global_nonce: &[u8], local_nonce: &[u8], flags: RandomX
     vm.hash(&local_nonce)
 }
 
-fn run_prove_light(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> HashWithGroth16Prove {
+fn run_prove_light(global_nonce: &[u8], local_nonce: &[u8], flags: RandomXFlags) -> HashWithGroth16Proof {
     let cache = Cache::new(&global_nonce, flags).unwrap();
     let mut vm = IronLightVM::new(cache, flags).unwrap();
     vm.prove_light(&local_nonce)
@@ -87,7 +87,7 @@ fn prove_light_works() {
         .with(ForestLayer::default())
         .init();
 
-    let HashWithGroth16Prove {hash, proof} = run_prove_light(&global_nonce, &local_nonce, flags);
+    let HashWithGroth16Proof {hash, proof} = run_prove_light(&global_nonce, &local_nonce, flags);
     let hex_string: String = hash
         .into_slice()
         .iter()
