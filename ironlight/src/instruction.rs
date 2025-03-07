@@ -15,7 +15,12 @@
  */
 use std::fmt;
 
-// WIP align is questionable here
+use crate::{constants::STORE_L3_CONDITION, registers::REGISTER_COUNT};
+
+static L1_LABEL: &str = "L1";
+static L2_LABEL: &str = "L2";
+static L3_LABEL: &str = "L3";
+
 #[repr(C, align(8))]
 #[derive(Debug, Copy, Clone)]
 pub struct Instruction {
@@ -27,36 +32,36 @@ pub struct Instruction {
 }
 
 pub const NAMES_FREQS: [(&str, u8); 30] = [
-    ("IADD_RS",    16),
-    ("IADD_M",      7),
-    ("ISUB_R",     16),
-    ("ISUB_M",      7),
-    ("IMUL_R",     16),
-    ("IMUL_M",      4),
-    ("IMULH_R",     4),
-    ("IMULH_M",     1),
-    ("ISMULH_R",    4),
-    ("ISMULH_M",    1),
-    ("IMUL_RCP",    8),
-    ("INEG_R",      2),
-    ("IXOR_R",     15),
-    ("IXOR_M",      5),
-    ("IROR_R",      8),
-    ("IROL_R",      2),
-    ("ISWAP_R",     4),
-    ("FSWAP_R",     4),
-    ("FADD_R",     16),
-    ("FADD_M",      5),
-    ("FSUB_R",     16),
-    ("FSUB_M",      5),
-    ("FSCAL_R",     6),
-    ("FMUL_R",     32),
-    ("FDIV_M",      4),
-    ("FSQRT_R",     6),
-    ("CBRANCH",    25),
-    ("CFROUND",     1),
-    ("ISTORE",     16),
-    ("NOP",         0),
+    ("IADD_RS", 16),
+    ("IADD_M", 7),
+    ("ISUB_R", 16),
+    ("ISUB_M", 7),
+    ("IMUL_R", 16),
+    ("IMUL_M", 4),
+    ("IMULH_R", 4),
+    ("IMULH_M", 1),
+    ("ISMULH_R", 4),
+    ("ISMULH_M", 1),
+    ("IMUL_RCP", 8),
+    ("INEG_R", 2),
+    ("IXOR_R", 15),
+    ("IXOR_M", 5),
+    ("IROR_R", 8),
+    ("IROL_R", 2),
+    ("ISWAP_R", 4),
+    ("FSWAP_R", 4),
+    ("FADD_R", 16),
+    ("FADD_M", 5),
+    ("FSUB_R", 16),
+    ("FSUB_M", 5),
+    ("FSCAL_R", 6),
+    ("FMUL_R", 32),
+    ("FDIV_M", 4),
+    ("FSQRT_R", 6),
+    ("CBRANCH", 25),
+    ("CFROUND", 1),
+    ("ISTORE", 16),
+    ("NOP", 0),
 ];
 
 const fn build_instruction_array() -> [&'static str; 256] {
@@ -104,6 +109,26 @@ impl Instruction {
     pub fn get_mod_cond(&self) -> i32 {
         (self.mod_ >> 4) as i32
     }
+
+    pub fn get_address_reg(&self) -> &'static str {
+        if self.get_mod_mem() != 0 {
+            L1_LABEL
+        } else {
+            L2_LABEL
+        }
+    }
+
+    pub fn get_address_reg_dst(&self) -> &'static str {
+        if self.get_mod_cond() < STORE_L3_CONDITION {
+            if self.get_mod_mem() != 0 {
+                L1_LABEL
+            } else {
+                L2_LABEL
+            }
+        } else {
+            L3_LABEL
+        }
+    }
 }
 
 impl Default for Instruction {
@@ -120,7 +145,63 @@ impl Default for Instruction {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ", INSTR_NAMES[self.opcode as usize])?;
-        Ok(())
+        let dst_index = self.dst % REGISTER_COUNT as u8; 
+        let src_index = self.src % REGISTER_COUNT as u8;
+
+        match INSTR_NAMES[self.opcode as usize] {
+            "ISUB_R" => {
+                if dst_index != src_index {
+                    write!(f, "ISUB_R r{}, r{}", dst_index, src_index)
+                } else {
+                    write!(
+                        f,
+                        "ISUB_R r{}, {}",
+                        dst_index, self.get_imm32()
+                    )
+                }
+            }
+            "ISTORE" => {
+                write!(
+                    f,
+                    "ISTORE {}[r{} {}], r{}",
+                    self.get_address_reg_dst(),
+                    dst_index,
+                    self.get_imm32() as i32,
+                    src_index
+                )
+            }
+            "IADD_RS" | "IMUL_R" | "IMULH_R" | "ISMULH_R" | "IMUL_RCP" | "IXOR_R" | "IROR_R"
+            | "IROL_R" | "ISWAP_R" | "FSWAP_R" | "FADD_R" | "FSUB_R" | "FSCAL_R" | "FMUL_R"
+            | "FSQRT_R" => {
+                write!(
+                    f,
+                    "{} r{}, r{}",
+                    INSTR_NAMES[self.opcode as usize], dst_index, src_index
+                )
+            }
+            "IADD_M" | "ISUB_M" | "IMUL_M" | "IMULH_M" | "ISMULH_M" | "IXOR_M" | "FSUB_M"
+            | "FADD_M" | "FDIV_M" => {
+                write!(
+                    f,
+                    "{} r{}, [r{}]",
+                    INSTR_NAMES[self.opcode as usize], dst_index, src_index
+                )
+            }
+            "CBRANCH" => {
+                write!(f, "CBRANCH {}", self.imm32)
+            }
+            "CFROUND" => {
+                write!(f, "CFROUND {}", self.dst)
+            }
+            "INEG_R" => {
+                write!(f, "INEG_R r{}", self.dst)
+            }
+            "NOP" => {
+                write!(f, "NOP")
+            }
+            _ => {
+                write!(f, "{}", INSTR_NAMES[self.opcode as usize])
+            }
+        }
     }
 }
