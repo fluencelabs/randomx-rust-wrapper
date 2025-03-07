@@ -64,7 +64,6 @@ fn ironlight_mode_works() {
         .collect();
     println!("Expected result: {}", hex_string);
 
-
     assert_eq!(actual_result, expected_result);
 }
 
@@ -88,14 +87,14 @@ fn prove_light_works() {
         .init();
 
     let HashWithGroth16Proof {hash, proof} = run_prove_light(&global_nonce, &local_nonce, flags);
-    let hex_string: String = hash
+    let actual_result: String = hash
         .into_slice()
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
 
     println!("Groth16 proof: {}", hex::encode(proof));
-    println!("Result: {}", hex_string);
+    println!("Result: {}", actual_result);
     let expected_result = ResultHash::from_slice([
         133, 95, 150, 177, 51, 99, 179, 126, 55, 33, 61, 139, 120, 240, 233, 99, 78, 17, 195, 171,
         72, 165, 63, 121, 251, 194, 167, 44, 123, 31, 135, 219,
@@ -107,21 +106,21 @@ fn prove_light_works() {
         .collect();
     println!("Expected result: {}", hex_string);
 
-    // assert_eq!(actual_result, expected_result);
+    assert_eq!(hash, expected_result);
 }
 
 #[test]
-fn tshoot_aes() {
-    println!("Input:");
-
+fn aes_1rx4_hash_test() {
     let input = [42u8; 512];
-    let mut hash = [0u8; 512];
+    let mut hash = [0u8; 32];
 
-    println!("Input: {:?}", input);
     aes_1rx4_hash(&input, input.len(), &mut hash);
     let hex_string: String = hash
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
     println!("Result: {}", hex_string);
+    let expected_result = hex::decode("e62376feb81a39fbc4f7073e5616477eeaf67b9f1849f2dcfb60594a227bed9f").expect("There must be no errors.");
+
+    assert_eq!(hash, expected_result.as_slice());
 }
