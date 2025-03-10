@@ -5,6 +5,8 @@
 #![allow(non_camel_case_types)]
 
 pub mod flags {
+    #![allow(non_upper_case_globals)]
+    #![allow(non_camel_case_types)]
     pub const randomx_flags_RANDOMX_FLAG_DEFAULT: randomx_flags = 0;
     pub const randomx_flags_RANDOMX_FLAG_LARGE_PAGES: randomx_flags = 1;
     pub const randomx_flags_RANDOMX_FLAG_HARD_AES: randomx_flags = 2;
@@ -14,6 +16,8 @@ pub mod flags {
     pub const randomx_flags_RANDOMX_FLAG_ARGON2_SSSE3: randomx_flags = 32;
     pub const randomx_flags_RANDOMX_FLAG_ARGON2_AVX2: randomx_flags = 64;
     pub const randomx_flags_RANDOMX_FLAG_ARGON2: randomx_flags = 96;
+    pub const randomx_flags_RANDOMX_FLAG_IRONLIGHT: randomx_flags = 128;
+
 
     pub type randomx_flags = ::std::os::raw::c_uint;
 
@@ -31,6 +35,7 @@ pub mod flags {
 }
 
 pub mod cache {
+    #![allow(non_camel_case_types)]
     use super::flags::randomx_flags;
 
     #[repr(C)]
@@ -86,6 +91,10 @@ pub mod cache {
 }
 
 pub mod dataset {
+    #![allow(non_camel_case_types)]
+
+    use std::os::raw::c_void;
+
     use super::cache::randomx_cache;
     use super::flags::randomx_flags;
 
@@ -152,9 +161,15 @@ pub mod dataset {
         "]
         pub fn randomx_release_dataset(dataset: *mut randomx_dataset);
     }
+
+    extern "C" {
+        pub fn randomx_init_dataset_item(cache: *const randomx_cache, out: *mut c_void, item_number: u64);
+    }
 }
 
 pub mod vm {
+    #![allow(non_camel_case_types)]
+
     use super::cache::randomx_cache;
     use super::dataset::randomx_dataset;
     use super::flags::randomx_flags;
@@ -278,5 +293,26 @@ pub mod vm {
             machine: *mut randomx_vm,
             output: *mut ::std::os::raw::c_void,
         );
+    }
+}
+
+pub mod entropy {
+    extern "C" {
+        pub fn randomx_blake2b(out: *mut ::std::os::raw::c_void, outlen: usize, in_ptr: *const ::std::os::raw::c_void, inlen: usize,
+            key: *const ::std::os::raw::c_void, keylen: usize) -> i32;
+    }
+
+    extern "C" {
+        pub fn randomx_fill_aes_1rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+    }
+
+    extern "C" {
+        pub fn randomx_fill_aes_4rx4(state: *const ::std::os::raw::c_void, output_size: usize, buffer: *mut ::std::os::raw::c_void);
+    }
+}
+
+pub mod hashing {
+    extern "C" {
+        pub fn randomx_hash_aes_1rx4(input: *const ::std::os::raw::c_void, input_size: usize, hash: *mut ::std::os::raw::c_void);
     }
 }

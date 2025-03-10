@@ -31,6 +31,7 @@ bitflags! {
         const FLAG_ARGON2_SSSE3 = randomx_flags_RANDOMX_FLAG_ARGON2_SSSE3;
         const FLAG_ARGON2_AVX2 = randomx_flags_RANDOMX_FLAG_ARGON2_AVX2;
         const FLAG_ARGON2 = randomx_flags_RANDOMX_FLAG_ARGON2;
+        const FLAG_IRONLIGHT = randomx_flags_RANDOMX_FLAG_IRONLIGHT;
     }
 }
 
@@ -41,6 +42,10 @@ impl RandomXFlags {
 
     pub fn is_light_mode(&self) -> bool {
         !self.is_fast_mode()
+    }
+
+    pub fn is_ironlight_mode(&self) -> bool {
+        self.is_light_mode() && self.contains(RandomXFlags::FLAG_IRONLIGHT)
     }
 
     pub fn is_large_pages(&self) -> bool {

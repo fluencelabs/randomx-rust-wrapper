@@ -3,10 +3,12 @@ resolver = "2"
 members = [
     "crates/types",
     "wrapper",
+    "ironlight"
 ]
 
 [workspace.dependencies]
 ccp-randomx-types = { path = "./crates/types", version = "0.1.0" }
+ccp-randomx = { path = "./wrapper", version = "0.1.0" }
 
 bitflags = "2.4"
 cmake = "0.1"

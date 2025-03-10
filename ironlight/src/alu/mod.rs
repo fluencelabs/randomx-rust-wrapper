@@ -14,21 +14,4 @@
  * limitations under the License.
  */
 
-pub use ccp_randomx_types::ResultHash;
-pub use ccp_randomx_types::RANDOMX_RESULT_SIZE;
-
-pub trait ToRawMut {
-    fn empty() -> Self;
-
-    fn as_raw_mut(&mut self) -> *mut std::ffi::c_void;
-}
-
-impl ToRawMut for ResultHash {
-    fn empty() -> Self {
-        ResultHash::from_slice([0u8; RANDOMX_RESULT_SIZE])
-    }
-
-    fn as_raw_mut(&mut self) -> *mut std::ffi::c_void {
-        self.as_mut().as_mut_ptr() as *mut std::ffi::c_void
-    }
-}
+ pub(crate) mod addsub;

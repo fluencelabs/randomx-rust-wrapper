@@ -1,1 +1,3 @@
 /target
+./wrapper/randomx/CMakeFiles/*
+./wrapper/randomx/*.a
