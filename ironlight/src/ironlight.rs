@@ -179,7 +179,6 @@ where
         }
 
         let config = ProgramConfiguration::default();
-        // TBD move into a separate f
         let scratchpad: Vec<u8>;
         unsafe {
             let size = RANDOMX_SCRATCHPAD_L3 * std::mem::size_of::<u8>();
@@ -301,7 +300,7 @@ where
             prove(&config, &rx_circuit, &mut challenger, stark_trace, &public_values);
 
         let mut challenger = InnerChallenger::new(perm.clone());
-        // WIP
+
         verify(
             &config,
             &rx_circuit,
@@ -403,7 +402,7 @@ where
             sp_addr1 ^= sp_mix >> 32;
             sp_addr1 &= SCRATCHPAD_L3_MASK64 as u64;
 
-            // WIP consider using vectorized xor here
+            // TBD consider using vectorized xor here
             for i in 0..REGISTER_COUNT {
                 let entropy_address = sp_addr0 as usize + 8usize * i;
                 let scratchpad_entropy =

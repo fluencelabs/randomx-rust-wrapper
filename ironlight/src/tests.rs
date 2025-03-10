@@ -43,7 +43,6 @@ fn ironlight_mode_works() {
     let global_nonce = vec![1, 2, 3, 4, 5, 6, 7];
     let local_nonce = vec![2, 3, 4, 5, 6, 7];
     let flags = RandomXFlags::DEFAULT | RandomXFlags::FLAG_IRONLIGHT;
-    println!("Flags: {:?}", flags);
 
     let actual_result = run_ironlight_randomx(&global_nonce, &local_nonce, flags);
     let hex_string: String = actual_result

@@ -34,7 +34,6 @@ pub(crate) fn _dummy_vk() -> StarkVerifyingKey<BabyBearPoseidon2> {
 }
 
 fn convert_opened_values_<F: p3_field::Field, EF: ExtensionField<F>>(
-  // chip: &Chip<F, A>,
   p3_opended_values: &OpenedValues<EF>,
   log_degree: usize,
 ) -> ChipOpenedValues<EF> {
@@ -45,8 +44,6 @@ fn convert_opened_values_<F: p3_field::Field, EF: ExtensionField<F>>(
       local: vec![EF::zero(); BIN_OP_ROW_SIZE],
       next: vec![EF::zero(); BIN_OP_ROW_SIZE],
   };
-  // let main_width = chip.width();
-  // let permutation_width = chip.permutation_width();
   let permutation = AirOpenedValues {
       local: vec![EF::zero(); BIN_OP_ROW_SIZE * EF::D],
       next: vec![EF::zero(); BIN_OP_ROW_SIZE * EF::D],
@@ -64,7 +61,6 @@ fn convert_opened_values_<F: p3_field::Field, EF: ExtensionField<F>>(
       next: trace_next.clone(),
   };
 
-  // let quotient_width = chip.quotient_width();
   let quotient = quotient_chunks.clone();
 
   ChipOpenedValues {
@@ -78,12 +74,9 @@ fn convert_opened_values_<F: p3_field::Field, EF: ExtensionField<F>>(
   }
 }
 
-// fn p3_proof_to_shardproof<SC: sp1_stark::StarkGenericConfig>(
 pub(crate) fn p3_proof_to_shardproof(
   p3_proof: P3Proof,
-  // air: ProgExec<BabyBear>,
 ) -> ShardProof<sp1_stark::baby_bear_poseidon2::BabyBearPoseidon2> {
-  // let shape = ProofShape { chip_information: vec![("p3_stark".to_string(), 42)] };
   let P3Proof {
       commitments,
       opened_values,
@@ -116,7 +109,6 @@ pub(crate) fn p3_proof_to_shardproof(
 
 pub(crate) fn _get_sp1_core_proofdata(
   p3_proof: P3Proof,
-  /*air: ProgExec<BabyBear>*/
 ) -> SP1CoreProofData {
   let shard_proof = p3_proof_to_shardproof(p3_proof);
   let shard_proofs = vec![shard_proof];
